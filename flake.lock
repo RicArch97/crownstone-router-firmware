@@ -1,0 +1,45 @@
+{
+  "nodes": {
+    "junitparser": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1660898495,
+        "narHash": "sha256-rhDP05GSWT4K6Z2ip8C9+e3WbvBJOwP0vctvANBs7cw=",
+        "owner": "weiwei",
+        "repo": "junitparser",
+        "rev": "af4f06163aa949f4944dc37bd487d95c209182df",
+        "type": "github"
+      },
+      "original": {
+        "owner": "weiwei",
+        "ref": "2.8.0",
+        "repo": "junitparser",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1668087632,
+        "narHash": "sha256-T/cUx44aYDuLMFfaiVpMdTjL4kpG7bh0VkN6JEM78/E=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "5f588eb4a958f1a526ed8da02d6ea1bea0047b9f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "junitparser": "junitparser",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
