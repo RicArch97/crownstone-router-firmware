@@ -1,0 +1,20 @@
+/* Enable Wifi */
+&wifi {
+  status = "okay";
+};
+
+/* Enable Ethernet */
+&eth {
+	status = "okay";
+	phy: phy {
+		compatible = "ethernet-phy";
+		status = "okay";
+		address = < 0x1 >;
+		mdio = < &mdio >;
+	};
+};
+
+
+&mdio {
+	status = "okay";
+};
