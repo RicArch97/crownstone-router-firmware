@@ -1,19 +1,18 @@
-/* Enable Wifi */
+// Enable Wifi
 &wifi {
-  status = "okay";
+	status = "okay";
 };
 
-/* Enable Ethernet */
+// Enable Ethernet
 &eth {
 	status = "okay";
 	phy: phy {
 		compatible = "ethernet-phy";
 		status = "okay";
-		address = < 0x1 >;
-		mdio = < &mdio >;
+		address = <0x1>;
+		mdio = <&mdio>;
 	};
 };
-
 
 &mdio {
 	status = "okay";

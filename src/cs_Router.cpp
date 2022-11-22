@@ -11,10 +11,10 @@
 LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 
 #include "cs_ReturnTypes.h"
-#include "network/cs_Wifi.h"
+#include "drivers/network/cs_Wifi.h"
 
-#define TEST_SSID "ssid"
-#define TEST_PSK  "psk"
+#define TEST_SSID "crownstonerouter"
+#define TEST_PSK  "test1234"
 
 int main(void)
 {
@@ -22,12 +22,14 @@ int main(void)
 
 	if (wifi->init((uint8_t *)TEST_SSID, strlen(TEST_SSID), (uint8_t *)TEST_PSK,
 		       strlen(TEST_PSK)) == CS_OK) {
-		LOG_INF("Crownstone router initialized");
+		LOG_INF("Wifi initialized");
 	}
 
 	if (wifi->connect() == CS_OK) {
 		LOG_INF("Wifi connection request done successfully");
 	}
+
+	LOG_INF("Crownstone router initialized");
 
 	return 0;
 }

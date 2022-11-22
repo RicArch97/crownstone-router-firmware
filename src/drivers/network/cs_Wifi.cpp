@@ -5,7 +5,7 @@
  * License: Apache License 2.0
  */
 
-#include <stdlib.h>
+#include <string.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Network, LOG_LEVEL_INF);
@@ -15,7 +15,7 @@ LOG_MODULE_REGISTER(cs_Network, LOG_LEVEL_INF);
 #include <zephyr/sys/util.h>
 
 #include "cs_ReturnTypes.h"
-#include "network/cs_Wifi.h"
+#include "drivers/network/cs_Wifi.h"
 
 #define WIFI_MODULE DT_NODELABEL(wifi)
 #define WIFI_MGMT_EVENTS                                                                           \
@@ -26,7 +26,7 @@ static struct k_mutex cb_mutex;
 static struct k_event wifi_scan_event;
 
 /**
- * @brief Initialize the Network module.
+ * @brief Initialize the wifi module.
  *
  * @return CS_OK if the wifi module was sucessfully initialized.
  */
