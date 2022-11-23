@@ -5,6 +5,8 @@
  * License: Apache License 2.0
  */
 
+#include <errno.h>
+
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Rs485, LOG_LEVEL_INF);
 
@@ -21,7 +23,7 @@ LOG_MODULE_REGISTER(cs_Rs485, LOG_LEVEL_INF);
  *
  * @return CS_OK if the RS485 module was sucessfully initialized.
  */
-cs_err_t Rs485::init()
+cs_err_t Rs485::init(uint8_t baudrate)
 {
   if (_isInitialized) {
     LOG_ERR("Already initialized");
@@ -36,7 +38,33 @@ cs_err_t Rs485::init()
 	}
 
   // configure callback to receive data asynchronously
-  uart_callback_set(rs485_dev, handle_uart_event, NULL);
+  int ret = uart_callback_set(rs485_dev, handle_uart_event, NULL);
+  switch (ret) {
+  case -ENOSYS:
+    LOG_ERR("Asynchronous api not supported by this device");
+    return CS_ERR_NOT_SUPPORTED;
+  case -ENOTSUP:
+    LOG_ERR("Asynchronous api not enabled");
+    return CS_ERR_NOT_ENABLED;
+  default:
+    break;
+  }
+
+  // configure uart parameters
+  struct uart_config uart_cfg = {0};
+  uart_cfg.baudrate = baudrate;
+  uart_cfg.flow_ctrl = UART_CFG_FLOW_CTRL_NONE;
+  // use most common serial implematentation: 8-N-1
+  uart_cfg.data_bits = UART_CFG_DATA_BITS_8;
+  uart_cfg.parity = UART_CFG_PARITY_NONE;
+  uart_cfg.stop_bits = UART_CFG_STOP_BITS_1;
+
+  if (uart_configure(rs485_dev, &uart_cfg) != 0) {
+		LOG_ERR("Failed to configure uart");
+		return CS_ERR_UART_CONFIG_FAILED;
+	}
+
+  return CS_OK;
 }
 
 /**

@@ -30,7 +30,7 @@ static struct k_event wifi_scan_event;
  *
  * @return CS_OK if the wifi module was sucessfully initialized.
  */
-cs_err_t Wifi::init(const uint8_t *ssid, uint8_t ssid_len, const uint8_t *psk, uint8_t psk_len)
+cs_err_t Wifi::init(const char *ssid, const char *psk)
 {
 	if (_isInitialized) {
 		LOG_ERR("Already initialized");
@@ -60,11 +60,12 @@ cs_err_t Wifi::init(const uint8_t *ssid, uint8_t ssid_len, const uint8_t *psk, u
 	k_mutex_init(&cb_mutex);
 	k_event_init(&wifi_scan_event);
 
+	// clamp lengths to the max supported
+	_ssid_len = (uint8_t)CLAMP(strlen(ssid), 0, WIFI_SSID_MAX_LEN);
+	_psk_len = (uint8_t)CLAMP(strlen(psk), 0, WIFI_PSK_MAX_LEN);
 	// store ssid and psk
-	_ssid_len = CLAMP(ssid_len, 0, WIFI_SSID_MAX_LEN);
-	_psk_len = CLAMP(psk_len, 0, WIFI_PSK_MAX_LEN);
-	memcpy(_ssid, ssid, _ssid_len);
-	memcpy(_psk, psk, _psk_len);
+	memcpy(_ssid, (uint8_t*)ssid, _ssid_len);
+	memcpy(_psk, (uint8_t*)psk, _psk_len);
 
 	_isInitialized = true;
 

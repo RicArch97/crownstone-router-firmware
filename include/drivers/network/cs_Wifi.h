@@ -34,7 +34,7 @@ public:
 	Wifi(Wifi const &) = delete;
 	void operator=(Wifi const &) = delete;
 
-	cs_err_t init(const uint8_t *ssid, uint8_t ssid_len, const uint8_t *psk, uint8_t psk_len);
+	cs_err_t init(const char *ssid, const char *psk);
 	cs_err_t connect();
 	cs_err_t disconnect();
 

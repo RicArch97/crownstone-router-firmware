@@ -20,8 +20,7 @@ int main(void)
 {
 	Wifi *wifi = &Wifi::getInstance();
 
-	if (wifi->init((uint8_t *)TEST_SSID, strlen(TEST_SSID), (uint8_t *)TEST_PSK,
-		       strlen(TEST_PSK)) == CS_OK) {
+	if (wifi->init(TEST_SSID, TEST_PSK) == CS_OK) {
 		LOG_INF("Wifi initialized");
 	}
 
