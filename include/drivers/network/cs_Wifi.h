@@ -17,9 +17,8 @@
 
 #include "cs_ReturnTypes.h"
 
-#define SCAN_RESULT_EVENT  0x001
+#define SSID_FOUND_EVENT  0x001
 // timeouts in ms
-#define MUTEX_LOCK_TIMEOUT 100
 #define SCAN_TIMEOUT	   5000
 #define CONNECT_TIMOUT	   10000
 

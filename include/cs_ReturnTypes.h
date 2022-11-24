@@ -25,4 +25,6 @@ typedef int cs_err_t;
 #define CS_ERR_WIFI_DISCONNECT_REQUEST_FAILED   0x204
 #define CS_ERR_WIFI_NOT_CONNECTED               0x205
 
-#define CS_ERR_UART_CONFIG_FAILED               0x301
+#define CS_ERR_UART_CONFIG_INVALID              0x301
+#define CS_ERR_UART_CONFIG_FAILED               0x302
+#define CS_ERR_UART_RX_FAILED                   0x303
