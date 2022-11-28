@@ -6,6 +6,7 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Network, LOG_LEVEL_INF);
@@ -22,7 +23,6 @@ LOG_MODULE_REGISTER(cs_Network, LOG_LEVEL_INF);
 	(NET_EVENT_WIFI_SCAN_RESULT | NET_EVENT_WIFI_SCAN_DONE | NET_EVENT_WIFI_CONNECT_RESULT |   \
 	 NET_EVENT_WIFI_DISCONNECT_RESULT)
 
-static struct k_mutex mut_inst_access;
 static struct k_event evt_ssid_found;
 
 /**
@@ -53,11 +53,10 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
 
 	// initialize and add wifi event handler
 	static struct net_mgmt_event_callback wifi_mgmt_cb;
-	net_mgmt_init_event_callback(&wifi_mgmt_cb, handle_wifi_result, WIFI_MGMT_EVENTS);
+	net_mgmt_init_event_callback(&wifi_mgmt_cb, handleWifiResult, WIFI_MGMT_EVENTS);
 	net_mgmt_add_event_callback(&wifi_mgmt_cb);
 
-	// init mutex and scan result received event
-	k_mutex_init(&mut_inst_access);
+	// init ssid found event
 	k_event_init(&evt_ssid_found);
 
 	// clamp lengths to the max supported
@@ -133,18 +132,18 @@ cs_err_t Wifi::disconnect()
 /**
  * @brief Handle wifi events.
  */
-void Wifi::handle_wifi_result(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+void Wifi::handleWifiResult(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
 			      struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_SCAN_RESULT:
-		handle_wifi_scan_result(cb);
+		handleWifiScanResult(cb);
 		break;
 	case NET_EVENT_WIFI_CONNECT_RESULT:
-		handle_wifi_connection_result(cb, false);
+		handleWifiConnectionResult(cb, false);
 		break;
 	case NET_EVENT_WIFI_DISCONNECT_RESULT:
-		handle_wifi_connection_result(cb, true);
+		handleWifiConnectionResult(cb, true);
 		break;
 	default:
 		break;
@@ -154,15 +153,10 @@ void Wifi::handle_wifi_result(struct net_mgmt_event_callback *cb, uint32_t mgmt_
 /**
  * @brief Handle wifi scan result.
  */
-void Wifi::handle_wifi_scan_result(struct net_mgmt_event_callback *cb)
+void Wifi::handleWifiScanResult(struct net_mgmt_event_callback *cb)
 {
 	const struct wifi_scan_result *entry = (const struct wifi_scan_result *)cb->info;
 
-	// lock mutex to safely access singleton instance
-	// make sure to process every result
-	if (k_mutex_lock(&mut_inst_access, K_FOREVER) != 0) {
-		return;
-	}
 	Wifi *wifi = &Wifi::getInstance();
 	
 	if (memcmp(wifi->_ssid, entry->ssid, wifi->_ssid_len) == 0) {
@@ -170,17 +164,16 @@ void Wifi::handle_wifi_scan_result(struct net_mgmt_event_callback *cb)
 		wifi->_cnx_params.band = entry->band;
 		wifi->_cnx_params.channel = entry->channel;
 		wifi->_cnx_params.mfp = entry->mfp;
+
 		// post event once given ssid was matched
 		k_event_post(&evt_ssid_found, SSID_FOUND_EVENT);
 	}
-
-	k_mutex_unlock(&mut_inst_access);
 }
 
 /**
  * @brief Handle wifi connect result.
  */
-void Wifi::handle_wifi_connection_result(struct net_mgmt_event_callback *cb, bool disconnect)
+void Wifi::handleWifiConnectionResult(struct net_mgmt_event_callback *cb, bool disconnect)
 {
 	const struct wifi_status *status = (const struct wifi_status *)cb->info;
 	const char *msg = disconnect ? "Disconnection" : "Connection";
@@ -197,5 +190,5 @@ void Wifi::handle_wifi_connection_result(struct net_mgmt_event_callback *cb, boo
  */
 Wifi::~Wifi()
 {
-	k_free(_iface);
+	free(_iface);
 }

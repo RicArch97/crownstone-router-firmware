@@ -12,6 +12,6 @@
 		reg = <0x0>;
 		spi-max-frequency = <10000000>;
     int-gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
-    reset-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
+    reset-gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
 	};
 };

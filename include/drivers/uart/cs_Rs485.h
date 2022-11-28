@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <zephyr/device.h>
+#include <zephyr/kernel.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/sys/time_units.h>
 
@@ -18,9 +19,8 @@
 #define RS485_BAUD_MIN 110
 #define RS485_BAUD_MAX 115200
 
-#define NUM_BITS	 11
 #define UART_BUFFER_SIZE 256
-#define MAX_DELAY	 3500000
+#define UART_BUFFER_QUEUE_SIZE 10
 
 struct cs_uart_config {
 	uint32_t baudrate;
@@ -36,22 +36,21 @@ public:
 		static Rs485 instance;
 		return instance;
 	}
-	RS485(Rs485 const &) = delete;
+	Rs485(Rs485 const &) = delete;
 	void operator=(Rs485 const &) = delete;
 
 	cs_err_t init(struct cs_uart_config *cfg);
+	void getUartMessages();
+	void printUart(const char *buf);
 
 private:
 	Rs485() {}
-	~Rs485();
-	static void handle_uart_event(const struct device *dev, struct uart_event *evt,
-				      void *user_data);
-	static void handle_rx_buf_rq(const struct device *dev, struct uart_event *evt);
-	static void handle_uart_data(const struct device *dev, struct uart_event *evt);
+	static void handleUartInterrupt(const struct device *dev, void *user_data);
+	static void handleUartTimeout(struct k_timer *t_id);
 
 	bool _isInitialized = false;
-
-	uint8_t *_rx_msg_buf = NULL;
-	uint8_t *_rx_msg_buf_ptr = NULL;
+	const struct device *_rs485_dev = NULL;
+	
+	uint8_t _rx_msg_buf[UART_BUFFER_SIZE] = {0};
 	uint16_t _rx_msg_buf_ctr = 0;
 };

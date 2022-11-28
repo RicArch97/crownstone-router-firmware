@@ -44,10 +44,10 @@ private:
 	Wifi() {}
 	~Wifi();
 	// callbacks
-	static void handle_wifi_result(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+	static void handleWifiResult(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
 				       struct net_if *iface);
-	static void handle_wifi_scan_result(struct net_mgmt_event_callback *cb);
-	static void handle_wifi_connection_result(struct net_mgmt_event_callback *cb,
+	static void handleWifiScanResult(struct net_mgmt_event_callback *cb);
+	static void handleWifiConnectionResult(struct net_mgmt_event_callback *cb,
 						  bool disconnect);
 
 	bool _isInitialized = false;
