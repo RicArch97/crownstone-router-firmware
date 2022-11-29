@@ -19,15 +19,15 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 
 int main(void)
 {
-	Wifi *wifi = &Wifi::getInstance();
+	// Wifi *wifi = &Wifi::getInstance();
 
-	if (wifi->init(TEST_SSID, TEST_PSK) == CS_OK) {
-		LOG_INF("Wifi initialized");
-	}
+	// if (wifi->init(TEST_SSID, TEST_PSK) == CS_OK) {
+	// 	LOG_INF("Wifi initialized");
+	// }
 
-	if (wifi->connect() == CS_OK) {
-		LOG_INF("Wifi connection request done successfully");
-	}
+	// if (wifi->connect() == CS_OK) {
+	// 	LOG_INF("Wifi connection request done successfully");
+	// }
 
 	struct cs_uart_config cfg = {
 		.baudrate = 115200
@@ -38,8 +38,6 @@ int main(void)
 	if (rs485->init(&cfg) == CS_OK) {
 		LOG_INF("Rs485 initialized");
 	}
-
-	rs485->getUartMessages();
 
 	LOG_INF("Crownstone router initialized");
 

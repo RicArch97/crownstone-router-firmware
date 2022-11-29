@@ -40,17 +40,20 @@ public:
 	void operator=(Rs485 const &) = delete;
 
 	cs_err_t init(struct cs_uart_config *cfg);
-	void getUartMessages();
-	void printUart(const char *buf);
+	void sendUartMessage(uint8_t *msg, int len);
+	uint8_t *getUartMessage();
 
 private:
 	Rs485() {}
 	static void handleUartInterrupt(const struct device *dev, void *user_data);
-	static void handleUartTimeout(struct k_timer *t_id);
 
 	bool _isInitialized = false;
 	const struct device *_rs485_dev = NULL;
 	
-	uint8_t _rx_msg_buf[UART_BUFFER_SIZE] = {0};
-	uint16_t _rx_msg_buf_ctr = 0;
+	uint8_t _uart_rx_buf[UART_BUFFER_SIZE] = {0};
+	uint16_t _uart_rx_buf_ctr = 0;
+	
+	uint8_t *_uart_tx_buf = NULL;
+	uint8_t *_uart_tx_buf_ptr = NULL;
+	uint16_t _uart_tx_buf_ctr = 0;
 };
