@@ -184,11 +184,3 @@ void Wifi::handleWifiConnectionResult(struct net_mgmt_event_callback *cb, bool d
 		LOG_INF("%s succussful!", msg);
 	}
 }
-
-/**
- * @brief Free all heap allocated memory.
- */
-Wifi::~Wifi()
-{
-	free(_iface);
-}

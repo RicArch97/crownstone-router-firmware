@@ -3,14 +3,22 @@
 	status = "okay";
 };
 
-// Enable W5500 Ethernet module
-&spi2 {
+// Enable 2 UART connectors for RS485 and RS232
+&uart1 {
 	status = "okay";
-	w5500: w5500@0 {
-		compatible = "wiznet,w5500";
-		reg = <0x0>;
-		spi-max-frequency = <10000000>;
-    int-gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
-    reset-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
-	};
 };
+&uart2 {
+	status = "okay";
+};
+
+// Enable W5500 Ethernet module
+// &spi2 {
+// 	status = "okay";
+// 	w5500: w5500@0 {
+// 		compatible = "wiznet,w5500";
+// 		reg = <0x0>;
+// 		spi-max-frequency = <10000000>;
+//     int-gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+//     reset-gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
+// 	};
+// };

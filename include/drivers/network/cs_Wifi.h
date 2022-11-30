@@ -17,10 +17,10 @@
 
 #include "cs_ReturnTypes.h"
 
-#define SSID_FOUND_EVENT  0x001
+#define SSID_FOUND_EVENT 0x001
 // timeouts in ms
-#define SCAN_TIMEOUT	   5000
-#define CONNECT_TIMOUT	   10000
+#define SCAN_TIMEOUT	 5000
+#define CONNECT_TIMOUT	 10000
 
 class Wifi
 {
@@ -42,13 +42,11 @@ public:
 
 private:
 	Wifi() {}
-	~Wifi();
 	// callbacks
 	static void handleWifiResult(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
-				       struct net_if *iface);
+				     struct net_if *iface);
 	static void handleWifiScanResult(struct net_mgmt_event_callback *cb);
-	static void handleWifiConnectionResult(struct net_mgmt_event_callback *cb,
-						  bool disconnect);
+	static void handleWifiConnectionResult(struct net_mgmt_event_callback *cb, bool disconnect);
 
 	bool _isInitialized = false;
 	struct net_if *_iface = NULL;
