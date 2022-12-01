@@ -17,10 +17,10 @@
 
 #include "cs_ReturnTypes.h"
 
-#define SSID_FOUND_EVENT 0x001
+#define CS_WIFI_SSID_FOUND_EVENT 0x001
 // timeouts in ms
-#define SCAN_TIMEOUT	 5000
-#define CONNECT_TIMOUT	 10000
+#define CS_WIFI_SCAN_TIMEOUT	 5000
+#define CS_WIFI_CONNECT_TIMOUT	 10000
 
 class Wifi
 {

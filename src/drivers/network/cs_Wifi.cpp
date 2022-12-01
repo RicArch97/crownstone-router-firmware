@@ -90,7 +90,8 @@ cs_err_t Wifi::connect()
 
 	// it's possible the scan did not detect the given ssid
 	// return so connection can be reattempted
-	if (k_event_wait(&evt_ssid_found, SSID_FOUND_EVENT, true, K_MSEC(SCAN_TIMEOUT)) == 0) {
+	if (k_event_wait(&evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT, true,
+			 K_MSEC(CS_WIFI_SCAN_TIMEOUT)) == 0) {
 		LOG_ERR("Timeout on waiting for scan result");
 		return CS_ERR_WIFI_SCAN_RESULT_TIMEOUT;
 	}
@@ -99,7 +100,7 @@ cs_err_t Wifi::connect()
 	_cnx_params.ssid_length = _ssid_len;
 	_cnx_params.psk = _psk;
 	_cnx_params.psk_length = _psk_len;
-	_cnx_params.timeout = CONNECT_TIMOUT;
+	_cnx_params.timeout = CS_WIFI_CONNECT_TIMOUT;
 
 	LOG_DBG("ssid: %-32s | channel: %-4u band: (%-6s) | security: %-15s | mpf: %-9s",
 		_cnx_params.ssid, _cnx_params.channel,
@@ -133,7 +134,7 @@ cs_err_t Wifi::disconnect()
  * @brief Handle wifi events.
  */
 void Wifi::handleWifiResult(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
-			      struct net_if *iface)
+			    struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_SCAN_RESULT:
@@ -158,7 +159,7 @@ void Wifi::handleWifiScanResult(struct net_mgmt_event_callback *cb)
 	const struct wifi_scan_result *entry = (const struct wifi_scan_result *)cb->info;
 
 	Wifi *wifi = &Wifi::getInstance();
-	
+
 	if (memcmp(wifi->_ssid, entry->ssid, wifi->_ssid_len) == 0) {
 		wifi->_cnx_params.security = entry->security;
 		wifi->_cnx_params.band = entry->band;
@@ -166,7 +167,7 @@ void Wifi::handleWifiScanResult(struct net_mgmt_event_callback *cb)
 		wifi->_cnx_params.mfp = entry->mfp;
 
 		// post event once given ssid was matched
-		k_event_post(&evt_ssid_found, SSID_FOUND_EVENT);
+		k_event_post(&evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT);
 	}
 }
 

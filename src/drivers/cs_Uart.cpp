@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);
  * @brief Initialize the UART module.
  *
  * @param cfg Optional struct with custom baudrate, parity and stop bits.
- * when not provided, 9600,8,n,1 is used.
+ * when NULL is provided, 9600,8,n,1 is used.
  *
  * @return CS_OK if the UART module was sucessfully initialized.
  */
