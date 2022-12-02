@@ -9,89 +9,120 @@
 
 #include <stdint.h>
 
+#include <zephyr/net/wifi.h>
+
 #include "cs_ReturnTypes.h"
 
 /**
- * @brief Frame struct for the Crownstone router communication protocol.
+ * @brief Frame struct for an UART Crownstone router communication packet.
+ * Used for local communication.
  */
-struct cs_router_protocol {
-	/** protocol version */
-	struct cs_router_protocol_version version;
-	/** frame type */
-	struct cs_router_protocol_type type;
-	/** length of the rest of the structure up until checksum */
+struct cs_router_uart_packet {
+	/** Start token for a message */
+	uint8_t start_token;
+	/** Uart protocol version */
+	uint8_t protocol_version;
+	/** Length of all data beyond this field, including CRC */
 	uint16_t length;
-	/** where the data is coming from */
-	uint16_t source_id;
+	/** Frame type */
+	uint16_t type;
+	/** Payload containing a Crownstone router packet */
+	uint8_t *payload;
+	/** CRC16 of the payload */
+	uint16_t crc;
+} __packed;
+
+/**
+ * @brief Crownstone router packet types.
+ */
+enum cs_router_uart_packet_type {
+	CS_PACKET_TYPE_GENERIC,
+	/** CS_PACKET_TYPE_GENERIC_ENCRYPTED */
 };
 
 /**
- * @brief Frame struct containing protocol version data.
+ * @brief Frame struct for a generic Crownstone router communication packet.
+ * Used for cloud communication.
  */
-struct cs_router_protocol_version {
-	/** increased for breaking changes */
-	uint8_t major_version;
-	/** increased when new types are added */
-	uint8_t minor_version;
+struct cs_router_generic_packet {
+	/** Protocol version */
+	uint8_t protocol_version;
+	/** Frame type */
+	uint16_t type;
+	/** Length of the payload */
+	uint16_t length;
+	/** Payload containing an other data structure */
+	uint8_t *payload;
+} __packed;
+
+/**
+ * @brief Generic packet types.
+ */
+enum cs_router_generic_packet_type {
+	CS_PACKET_TYPE_CONTROL,
+	CS_PACKET_TYPE_RESULT,
+	CS_PACKET_TYPE_INCOMING_DATA
 };
 
 /**
- * @brief Frame struct containing frame type information.
+ * @brief Frame struct for a control packet.
  */
-struct cs_router_protocol_type {
-	/** main type */
-	enum cs_router_protocol_type_main main_type;
-	/** sub type */
-	union sub_type {
-		enum cs_router_protocol_type_command command_type;
-		enum cs_router_protocol_type_config config_type;
-		enum cs_router_protocol_type_result result_type;
-	};
+struct cs_router_control_packet {
+	/** Type of the command */
+	uint16_t command_type;
+	/** Length of the payload */
+	uint16_t length;
+	/** Payload according to the command type */
+	uint8_t *payload;
+	/** Reserved for future use */
+	uint8_t reserved;
+} __packed;
+
+/**
+ * @brief Control packet types.
+ */
+enum cs_router_control_packet_type {
+	CS_PACKET_TYPE_CONTROL_CONFIG,
+	CS_PACKET_TYPE_CONTROL_OPERATION,
+	CS_PACKET_TYPE_CONTROL_GET_STATE,
+	CS_PACKET_TYPE_CONTROL_RESET,
+	CS_PACKET_TYPE_CONTROL_FACTORY_RESET
 };
 
 /**
- * @brief Frame main type.
+ * @brief Frame struct for a config packet
  */
-enum cs_router_protocol_type_main {
-	CS_TYPE_COMMAND,
-	CS_TYPE_CONFIG,
-	CS_TYPE_RESULT,
-	CS_TYPE_INCOMING_DATA
+struct cs_router_config_packet {
+	/** Type of configuration */
+	uint16_t config_type;
+	/** Whether the configuration should be stored */
+	uint8_t persistence_mode;
+	/** Length of the payload */
+	uint16_t length;
+	/** Payload according to the config type */
+	uint8_t *payload;
+	/** Reserved for future use */
+	uint8_t reserved;
+} __packed;
+
+/**
+ * @brief Configuration types.
+*/
+enum cs_router_config_type {
+	CS_CONFIG_TYPE_WIFI_SSID,
+	CS_CONFIG_TYPE_WIFI_PSK,
+	CS_CONFIG_TYPE_UART_BAUDRATE,
+	CS_CONFIG_TYPE_UART_BUFFER_SIZE
 };
 
 /**
- * @brief Frame sub type command.
- *
- * Command types hinting that a command should be executed on the router.
+ * @brief Persistence modes, how configuration should be stored.
  */
-enum cs_router_protocol_type_command {
-	CS_TYPE_COMMAND_SETUP,
-	CS_TYPE_COMMAND_RESET,
-	CS_TYPE_COMMAND_GET_STATE,
-	CS_TYPE_COMMAND_SET_STATE
+enum cs_router_config_persistence_mode {
+	CS_CONFIG_PERSISTENCE_MODE_TEMPORARY,
+	CS_CONFIG_PERSISTENCE_MODE_STORED
 };
 
 /**
- * @brief Frame sub type config.
- *
- * Config options for the router itself which can be used
- * to override default configuration without editing the firmware.
- */
-enum cs_router_protocol_type_config {
-	CS_TYPE_CONFIG_WIFI_SSID,
-	CS_TYPE_CONFIG_WIFI_PSK,
-	CS_TYPE_CONFIG_UART_BAUDRATE,
-	CS_TYPE_CONFIG_UART_PARITY,
-	CS_TYPE_CONFIG_UART_STOP_BITS,
-	CS_TYPE_CONFIG_UART_RX_BUFFER_SIZE,
-	CS_TYPE_CONFIG_UART_RX_BUFFER_QUEUE_SIZE
-};
-
-/**
- * @brief Frame sub type result.
- */
-enum cs_router_protocol_type_result {
-	CS_TYPE_RESULT_SUCESS,
-	CS_TYPE_RESULT_MISMATCH,
-	CS_TYPE_RESULT_UNKNOWN_TYPE
-};
+ * @brief Frame struct for an operation packet
+*/

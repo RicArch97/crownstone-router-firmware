@@ -170,7 +170,7 @@ void Uart::handleUartInterrupt(const struct device *dev, void *user_data)
 		} else if (uart_inst->_uart_rx_buf_ctr < (CS_UART_BUFFER_SIZE - 1)) {
 			uart_inst->_uart_rx_buf[uart_inst->_uart_rx_buf_ctr++] = c;
 		}
-		// else: unhandled, do nothing
+		// else: unhandled, pass
 	}
 
 	// handle interrupt on TX

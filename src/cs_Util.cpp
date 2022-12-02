@@ -6,7 +6,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(cs_Util, LOG_LEVEL_INF);
 
 #include "cs_ReturnTypes.h"
 #include "cs_Router.h"
