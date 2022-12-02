@@ -94,7 +94,7 @@
         # Download Zephyr SDK / setup toolchain
         zephyrSdk = let
           pname = "zephyr-sdk";
-          version = "0.15.1";
+          version = "0.15.2";
           toolchain = "xtensa-espressif_esp32_zephyr-elf";
 
           system_fixup = {
@@ -113,7 +113,7 @@
 
             src = builtins.fetchurl {
               inherit url;
-              sha256 = "1i3ah6pwrs7kv2h1bzbhcpfv9yb08j6rizyajgfvyw1mwmjbg2zf";
+              sha256 = "1szxb1xvhnmf96a0flri950pf0kbpycv8gpx5rjbh92bkq8dqcdf";
             };
 
             sourceRoot = ".";
