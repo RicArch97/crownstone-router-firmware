@@ -6,18 +6,11 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
-    # Dependency override
-    junitparser = {
-      url = "github:weiwei/junitparser/2.8.0";
-      flake = false;
-    };
   };
 
   outputs = {
     self,
     nixpkgs,
-    junitparser,
   }: let
     # to work with older version of flakes
     lastModifiedDate = self.lastModifiedDate or self.lastModified or "19700101";
@@ -32,22 +25,7 @@
     forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
     # Nixpkgs instantiated for supported system types
-    nixpkgsFor = forAllSystems (system:
-      import nixpkgs {
-        inherit system;
-        overlays = [
-          # this package is not up to date in nixpkgs
-          (final: prev: {
-            python = prev.python.override {
-              packageOverrides = python-final: python-prev: {
-                junitparser = python-prev.junitparser.overrideAttrs (oldAttrs: {
-                  src = junitparser;
-                });
-              };
-            };
-          })
-        ];
-      });
+    nixpkgsFor = forAllSystems (system: import nixpkgs {inherit system;});
   in {
     devShells = forAllSystems (
       system: let
