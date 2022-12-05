@@ -17,8 +17,8 @@ LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);
 /**
  * @brief Initialize the UART module.
  *
- * @param cfg Optional struct with custom baudrate, parity and stop bits.
- * when NULL is provided, 9600,8,n,1 is used.
+ * @param cfg Optional struct with the mode, custom baudrate, parity and stop bits.
+ * when NULL is provided, raw mode and 9600,8,n,1 is used.
  *
  * @return CS_OK if the UART module was sucessfully initialized.
  */
@@ -41,26 +41,45 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 	uart_cfg.data_bits = UART_CFG_DATA_BITS_8;
 
 	if (cfg == NULL) {
-		uart_cfg.baudrate = CS_UART_BAUD_DEFAULT;
+		_uart_mode = CS_UART_MODE_RAW;
+
+		uart_cfg.baudrate = CS_UART_RS_BAUD_DEFAULT;
 		uart_cfg.parity = UART_CFG_PARITY_NONE;
 		uart_cfg.stop_bits = UART_CFG_STOP_BITS_1;
 	} else {
-		// according to RS485 and RS232 spec, baudrate between 110 and 115200
-		uart_cfg.baudrate = CLAMP(cfg->baudrate, CS_UART_BAUD_MIN, CS_UART_BAUD_MAX);
+		switch (cfg->mode) {
+		case CS_UART_MODE_RAW:
+			// according to RS485 and RS232 spec, baudrate between 110 and 115200
+			uart_cfg.baudrate = CLAMP(cfg->serial_cfg.baudrate, CS_UART_RS_BAUD_MIN,
+						  CS_UART_RS_BAUD_MAX);
 
-		switch (cfg->parity) {
-		case UART_CFG_PARITY_ODD:
-		case UART_CFG_PARITY_EVEN:
-			uart_cfg.parity = cfg->parity;
-			uart_cfg.stop_bits = UART_CFG_STOP_BITS_1;
+			// use a total of 11 bits
+			switch (cfg->serial_cfg.parity) {
+			case UART_CFG_PARITY_ODD:
+			case UART_CFG_PARITY_EVEN:
+				uart_cfg.parity = cfg->serial_cfg.parity;
+				uart_cfg.stop_bits = UART_CFG_STOP_BITS_1;
+				break;
+			case UART_CFG_PARITY_NONE:
+				uart_cfg.parity = cfg->serial_cfg.parity;
+				uart_cfg.stop_bits = cfg->serial_cfg.stop_bits;
+				break;
+			default:
+				LOG_ERR("Invalid parity bit option provided");
+				return CS_ERR_UART_CONFIG_INVALID;
+			}
 			break;
-		case UART_CFG_PARITY_NONE:
-			uart_cfg.parity = cfg->parity;
-			uart_cfg.stop_bits = cfg->stop_bits;
+		case CS_UART_MODE_PACKETS:
+			uart_cfg.baudrate = cfg->serial_cfg.baudrate;
+			uart_cfg.parity = cfg->serial_cfg.parity;
+			uart_cfg.stop_bits = cfg->serial_cfg.stop_bits;
 			break;
 		default:
+			LOG_ERR("Invalid uart mode provided");
 			return CS_ERR_UART_CONFIG_INVALID;
 		}
+
+		_uart_mode = cfg->mode;
 	}
 
 	if (uart_configure(_uart_dev, &uart_cfg) != 0) {

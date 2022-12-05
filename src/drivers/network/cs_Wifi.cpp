@@ -27,6 +27,9 @@ static struct k_event evt_ssid_found;
 
 /**
  * @brief Initialize the wifi module.
+ * 
+ * @param ssid SSID of the Wifi network.
+ * @param psk Passkey of the Wifi network.
  *
  * @return CS_OK if the wifi module was sucessfully initialized.
  */
