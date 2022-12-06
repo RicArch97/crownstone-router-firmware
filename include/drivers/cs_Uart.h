@@ -76,7 +76,7 @@ public:
 private:
 	static void handleUartInterrupt(const struct device *dev, void *user_data);
 
-	bool _isInitialized = false;
+	bool _is_initialized = false;
 	const struct device *_uart_dev = NULL;
 	enum cs_uart_mode _uart_mode;
 	struct k_msgq _msgq_uart_msgs;

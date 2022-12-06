@@ -48,7 +48,7 @@ private:
 	static void handleWifiScanResult(struct net_mgmt_event_callback *cb);
 	static void handleWifiConnectionResult(struct net_mgmt_event_callback *cb, bool disconnect);
 
-	bool _isInitialized = false;
+	bool _is_initialized = false;
 	struct net_if *_iface = NULL;
 	struct wifi_connect_req_params _cnx_params = {0};
 };

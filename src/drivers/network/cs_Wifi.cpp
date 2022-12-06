@@ -35,7 +35,7 @@ static struct k_event evt_ssid_found;
  */
 cs_err_t Wifi::init(const char *ssid, const char *psk)
 {
-	if (_isInitialized) {
+	if (_is_initialized) {
 		LOG_ERR("Already initialized");
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
@@ -69,7 +69,7 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
 	memcpy(_ssid, (uint8_t *)ssid, _ssid_len);
 	memcpy(_psk, (uint8_t *)psk, _psk_len);
 
-	_isInitialized = true;
+	_is_initialized = true;
 
 	return CS_OK;
 }
@@ -81,7 +81,7 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
  */
 cs_err_t Wifi::connect()
 {
-	if (!_isInitialized) {
+	if (!_is_initialized) {
 		LOG_ERR("Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}

@@ -24,7 +24,7 @@ LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);
  */
 cs_err_t Uart::init(struct cs_uart_config *cfg)
 {
-	if (_isInitialized) {
+	if (_is_initialized) {
 		LOG_ERR("Already initialized");
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
@@ -98,16 +98,28 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 	// start listening on RX
 	uart_irq_rx_enable(_uart_dev);
 
+	_is_initialized = true;
+
 	return CS_OK;
 }
 
 /**
  * @brief Get one UART message from the message queue.
+ * blocks until one message is received.
  *
  * @return Pointer to buffer with the message allocated on the heap, NULL on empty queue or fail.
  */
 uint8_t *Uart::getUartMessage()
 {
+	if (!_is_initialized) {
+		LOG_ERR("Not initialized");
+		return NULL;
+	}
+	// check if there are messages in the queue
+	if (k_msgq_num_used_get(&_msgq_uart_msgs) == 0) {
+		return NULL;
+	}
+
 	uint8_t *buf = (uint8_t *)calloc(CS_UART_BUFFER_SIZE, sizeof(uint8_t));
 	if (buf == NULL) {
 		LOG_ERR("Failed to allocate memory for uart message buffer");
@@ -216,4 +228,5 @@ void Uart::handleUartInterrupt(const struct device *dev, void *user_data)
 Uart::~Uart()
 {
 	k_free(_uart_tx_buf);
+	k_msgq_cleanup(&_msgq_uart_msgs);
 }
