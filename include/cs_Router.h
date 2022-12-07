@@ -142,9 +142,9 @@ enum cs_router_result_code {
 	CS_RESULT_TYPE_UNSPECIFIED = (1 << 8)
 };
 
-/** 
+/**
  * @brief Data packet data types.
-*/
+ */
 enum cs_router_source_type {
 	CS_SOURCE_TYPE_UART,
 	CS_SOURCE_TYPE_BLE,
@@ -152,14 +152,27 @@ enum cs_router_source_type {
 };
 
 /**
- * @brief Data packet source id's.
-*/
-enum cs_router_source_id {
-	CS_SOURCE_ID_RS485,
-	CS_SOURCE_ID_RS232,
-	CS_SOURCE_ID_SERVER,
+ * @brief Data packet uart source id's.
+ */
+enum cs_router_source_uart_id {
+	CS_SOURCE_ID_RS485, // e.g. solar panel / heatpump / charging station
+	CS_SOURCE_ID_RS232, // e.g. dutch smart meter
+	CS_SOURCE_ID_CM4    // raspberry pi computer module 4 where application code runs
+};
+
+/**
+ * @brief Data packet cloud source id's.
+ */
+enum cs_router_source_cloud_id {
+	CS_SOURCE_ID_SERVER // cloud server where application code runs
+};
+
+/**
+ * @brief Data packet ble source id's.
+ */
+enum cs_router_source_ble_id {
 	CS_SOURCE_ID_CROWNSTONE_MESH,
-	/** CS_SOURCE_ID_CROWNSTONE_APP (undecided, possible to configure wifi on the router over BLE?) */ 
+	CS_SOURCE_ID_CROWNSTONE_APP // possible for wifi detail exchange?
 };
 
 /**
