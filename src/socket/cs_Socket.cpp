@@ -12,8 +12,9 @@ LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
 
 #include "cs_ReturnTypes.h"
 #include "cs_Router.h"
-#include "socket/cs_WebSocket.h"
+#include "socket/cs_Socket.h"
 
+#include <zephyr/kernel.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
 
@@ -28,7 +29,7 @@ LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
  *
  * @return CS_OK if the initialization is successful.
  */
-cs_err_t WebSocket::init(struct cs_socket_opts *opts)
+cs_err_t Socket::init(struct cs_socket_opts *opts)
 {
 	if (_is_initialized) {
 		LOG_ERR("Already initialized");
@@ -39,7 +40,7 @@ cs_err_t WebSocket::init(struct cs_socket_opts *opts)
 	if (IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
 		if (tls_credential_add(CA_CERTIFICATE_TAG, TLS_CREDENTIAL_CA_CERTIFICATE,
 				       ca_certificate, sizeof(ca_certificate)) < 0) {
-			LOG_ERR("Failed to register public certificate: %d", err);
+			LOG_ERR("Failed to register CA certificate");
 			return CS_ERR_SOCKET_CA_CERT_REGISTER_FAILED;
 		}
 	}
@@ -52,7 +53,7 @@ cs_err_t WebSocket::init(struct cs_socket_opts *opts)
 
 		// 2 byte integer to string
 		char port_str[3]; // uint16 + terminator
-		snprintk(port_str, sizeof(port_str), "%s", opts->domain.port);
+		snprintk(port_str, sizeof(port_str), "%hu", opts->domain.port);
 
 		// resolve host using DNS
 		struct zsock_addrinfo *res;
@@ -66,9 +67,9 @@ cs_err_t WebSocket::init(struct cs_socket_opts *opts)
 
 		// create socket, using TLS when specified
 		if (IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
-			_sock_nr = zsock_socket(res->ai_family, res->ai_socktype, IPPROTO_TLS_1_2);
+			_sock_id = zsock_socket(res->ai_family, res->ai_socktype, IPPROTO_TLS_1_2);
 		} else {
-			_sock_nr = zsock_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+			_sock_id = zsock_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		}
 	} else if (opts->host_mode == CS_SOCKET_HOST_ADDR) {
 		if (opts->use_ipv6) {
@@ -92,23 +93,22 @@ cs_err_t WebSocket::init(struct cs_socket_opts *opts)
 
 		// create socket, using TLS when specified
 		if (IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
-			_sock_nr = zsock_socket(_addr->sa_family, SOCK_STREAM, IPPROTO_TLS_1_2);
-
+			_sock_id = zsock_socket(_addr->sa_family, SOCK_STREAM, IPPROTO_TLS_1_2);
 		} else {
-			_sock_nr = zsock_socket(_addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
+			_sock_id = zsock_socket(_addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
 		}
 	} else {
 		LOG_ERR("Invalid mode provided");
 		return CS_ERR_SOCKET_INVALID_MODE;
 	}
 
-	if (_sock_nr < 0) {
+	if (_sock_id < 0) {
 		LOG_ERR("Failed to create socket");
 		return CS_ERR_SOCKET_CREATION_FAILED;
 	}
 
 	if (IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
-		if (zsock_setsockopt(_sock_nr, SOL_TLS, TLS_HOSTNAME, _host_name,
+		if (zsock_setsockopt(_sock_id, SOL_TLS, TLS_HOSTNAME, _host_name,
 				     strlen(_host_name)) < 0) {
 			LOG_ERR("Failed to set TLS hostname");
 			return CS_ERR_SOCKET_SET_TLS_HOSTNAME_FAILED;
@@ -118,101 +118,11 @@ cs_err_t WebSocket::init(struct cs_socket_opts *opts)
 			CA_CERTIFICATE_TAG,
 		};
 		// set TLS tags, in this case only certificate
-		if (zsock_setsockopt(_sock_nr, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_opt,
+		if (zsock_setsockopt(_sock_id, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_opt,
 				     sizeof(sec_tag_opt)) < 0) {
 			LOG_ERR("Failed to set TLS_SEC_TAG_LIST option");
 			return CS_ERR_SOCKET_SET_TLS_TAG_LIST_FAILED;
 		}
-	}
-
-	return CS_OK;
-}
-
-/**
- * @brief Connect the socket to the network.
- *
- * @return CS_OK if connection is successful.
- */
-cs_err_t WebSocket::connect()
-{
-	if (!_is_initialized) {
-		LOG_ERR("Not initialized");
-		return CS_ERR_NOT_INITIALIZED;
-	}
-
-	if (zsock_connect(_sock_nr, _addr, _addr_len) < 0) {
-		return CS_FAIL;
-	}
-
-	return CS_OK;
-}
-
-/**
- * @brief Close socket.
- */
-cs_err_t WebSocket::close()
-{
-	if (!_is_initialized || _sock_nr < 0) {
-		LOG_ERR("Not initialized");
-		return CS_ERR_NOT_INITIALIZED;
-	}
-
-	if (zsock_close(_sock_nr) < 0) {
-		LOG_ERR("Failed to close socket");
-		return CS_ERR_SOCKET_CLOSE_FAILED;
-	}
-
-	return CS_OK;
-}
-
-/**
- * @brief Send a HTTP GET request over the socket.
- *
- * @param endpoint Endpoint / url for the request
- *
- * @return CS_OK if the request was done succesfully.
- */
-cs_err_t WebSocket::sendHttpGetRequest(const char *endpoint)
-{
-	struct http_request get_req = {0};
-
-	get_req.method = HTTP_GET;
-	get_req.url = strcat("/", endpoint);
-	get_req.host = _host_name;
-	get_req.protocol = HTTP_PROTOCOL_VER;
-	get_req.recv_buf = _socket_recv_buf;
-	get_req.recv_buf_len = CS_SOCKET_RECV_BUFFER_SIZE;
-
-	if (http_client_req(_sock_nr, &get_req, CS_SOCKET_RECV_TIMEOUT, this) < 0) {
-		LOG_ERR("Failed to send http GET request");
-		return CS_ERR_SOCKET_HTTP_GET_FAILED;
-	}
-
-	return CS_OK;
-}
-
-/**
- * @brief Send a HTTP POST request over the socket.
- * 
- * @param endpoint Endpoint / url of the request
- * @param payload Payload that should be send to the server
-*/
-cs_err_t WebSocket::sendHttpPostRequest(const char *endpoint, const char *payload)
-{
-	struct http_request post_req = {0};
-
-	post_req.method = HTTP_POST;
-	post_req.url = strcat("/", endpoint);
-	post_req.host = _host_name;
-	post_req.protocol = HTTP_PROTOCOL_VER;
-	post_req.payload = payload;
-	post_req.payload_len = strlen(payload);
-	post_req.recv_buf = _socket_recv_buf;
-	post_req.recv_buf_len = CS_SOCKET_RECV_BUFFER_SIZE;
-
-	if (http_client_req(_sock_nr, &post_req, CS_SOCKET_RECV_TIMEOUT, this) < 0) {
-		LOG_ERR("Failed to send http POST request");
-		return CS_ERR_SOCKET_HTTP_GET_FAILED;
 	}
 
 	return CS_OK;
