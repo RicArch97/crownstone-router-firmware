@@ -18,30 +18,26 @@
 #define THREAD_STACK_SIZE 1024
 #define THREAD_SLEEP	  250
 
-#define CS_SOCKET_RECV_BUF_SIZE	    512
-#define CS_SOCKET_HTTP_HEADER_SIZE  30
-#define CS_SOCKET_RECV_TIMEOUT	    3000
-#define CS_SOCKET_RECV_RETRY_TIMOUT 50
+#define CS_WEBSOCKET_RECV_BUF_SIZE     512
+#define CS_WEBSOCKET_HTTP_HEADER_SIZE  30
+#define CS_WEBSOCKET_RECV_TIMEOUT      3000
+#define CS_WEBSOCKET_RECV_RETRY_TIMOUT 50
 
 class WebSocket : Socket
 {
-      public:
-	WebSocket();
-	WebSocket(struct cs_socket_opts *opts)
-	{
-		init(opts);
-	}
-
+public:
+	cs_err_t init(struct cs_socket_opts *opts);
 	cs_err_t connect(const char *url);
-	cs_err_t disconnect();
+	cs_err_t close();
 
-      private:
+private:
 	static cs_err_t handleWebsocketConnect(int sock, struct http_request *req, void *user_data);
 	static void handleTransport(void *cls, void *unused1, void *unused2);
 
-	struct cs_socket_opts *_opts = NULL;
+	bool _is_initialized = false;
 	int _websock_id = -1;
 
-	uint8_t _websocket_recv_buf[CS_SOCKET_RECV_BUF_SIZE];
-	uint8_t _websocket_recv_temp_buf[CS_SOCKET_RECV_BUF_SIZE + CS_SOCKET_HTTP_HEADER_SIZE];
+	uint8_t _websocket_recv_buf[CS_WEBSOCKET_RECV_BUF_SIZE];
+	uint8_t _websocket_recv_temp_buf[CS_WEBSOCKET_RECV_BUF_SIZE +
+					 CS_WEBSOCKET_HTTP_HEADER_SIZE];
 };

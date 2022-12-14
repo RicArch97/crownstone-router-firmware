@@ -15,6 +15,7 @@
 #include <zephyr/sys/time_units.h>
 
 #include "cs_ReturnTypes.h"
+#include "cs_Router.h"
 
 // supported baudrates by RS232 and RS485
 #define CS_UART_RS_BAUD_MIN	110
@@ -49,10 +50,10 @@ struct cs_uart_serial_params {
 
 /**
  * @brief Specific UART configuration, depending on the connection.
- * 
+ *
  * @param mode Which UART mode applies to this connection, one of @ref cs_uart_mode
  * @param serial_cfg Serial parameters to use for the connection
-*/
+ */
 struct cs_uart_config {
 	enum cs_uart_mode mode;
 	struct cs_uart_serial_params serial_cfg;
@@ -61,10 +62,11 @@ struct cs_uart_config {
 class Uart
 {
 public:
-	Uart() {}
-	Uart(const struct device *dev)
+	Uart();
+	Uart(const struct device *dev, enum cs_router_source_uart_id src_id)
 	{
 		_uart_dev = dev;
+		_src_id = src_id;
 	}
 	~Uart();
 
@@ -75,9 +77,11 @@ public:
 
 private:
 	static void handleUartInterrupt(const struct device *dev, void *user_data);
+	uint8_t *createUartPacket();
 
 	bool _is_initialized = false;
 	const struct device *_uart_dev = NULL;
+	enum cs_router_source_uart_id _src_id;
 	enum cs_uart_mode _uart_mode;
 	struct k_msgq _msgq_uart_msgs;
 

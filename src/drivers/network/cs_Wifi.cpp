@@ -6,7 +6,6 @@
  */
 
 #include <string.h>
-#include <stdlib.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Network, LOG_LEVEL_INF);

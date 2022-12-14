@@ -9,8 +9,6 @@
 
 #include <stdbool.h>
 
-#include <zephyr/kernel.h>
-
 #include "cs_ReturnTypes.h"
 
 /**
@@ -65,15 +63,16 @@ struct cs_socket_opts {
 
 class Socket
 {
-      public:
-	cs_err_t init(struct cs_socket_opts *opts);
-	cs_err_t close();
+public:
+	cs_err_t initSocket(struct cs_socket_opts *opts);
+	cs_err_t closeSocket();
 
-      protected:
-	bool _is_initialized = false;
-
+protected:
 	int _sock_id = -1;
 	struct sockaddr *_addr = NULL;
 	int _addr_len = 0;
 	const char *_host_name = NULL;
+
+private:
+	bool _is_initialized = false;
 };

@@ -5,31 +5,24 @@
  * License: Apache License 2.0
  */
 
-#include <string.h>
-
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
 
-#include "cs_ReturnTypes.h"
-#include "cs_Router.h"
-#include "socket/cs_Socket.h"
-
-#include <zephyr/kernel.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
-
 #include <zephyr/net/tls_credentials.h>
+
+#include "socket/cs_Socket.h"
 #include "socket/cs_CaCertificate.h"
 
 /**
- * @brief Initialize websocket.
+ * @brief Initialize socket.
  *
- * @param opts Instance of @ref cs_socket_opts. port and one of host_url
- * or peer_addr should be provided. hostname is required for TLS and peer_addr.
+ * @param opts Instance of @ref cs_socket_opts.
  *
  * @return CS_OK if the initialization is successful.
  */
-cs_err_t Socket::init(struct cs_socket_opts *opts)
+cs_err_t Socket::initSocket(struct cs_socket_opts *opts)
 {
 	if (_is_initialized) {
 		LOG_ERR("Already initialized");
@@ -123,6 +116,28 @@ cs_err_t Socket::init(struct cs_socket_opts *opts)
 			LOG_ERR("Failed to set TLS_SEC_TAG_LIST option");
 			return CS_ERR_SOCKET_SET_TLS_TAG_LIST_FAILED;
 		}
+	}
+
+	_is_initialized = true;
+
+	return CS_OK;
+}
+
+/**
+ * @brief Close socket.
+ *
+ * @return CS_OK if the socket was closed.
+ */
+cs_err_t Socket::closeSocket()
+{
+	if (!_is_initialized) {
+		LOG_ERR("Not initialized");
+		return CS_ERR_NOT_INITIALIZED;
+	}
+
+	if (_sock_id >= 0) {
+		zsock_close(_sock_id);
+		_sock_id = -1;
 	}
 
 	return CS_OK;

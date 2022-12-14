@@ -6,7 +6,6 @@
  */
 
 #include <errno.h>
-#include <stdlib.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);
@@ -120,14 +119,14 @@ uint8_t *Uart::getUartMessage()
 		return NULL;
 	}
 
-	uint8_t *buf = (uint8_t *)calloc(CS_UART_BUFFER_SIZE, sizeof(uint8_t));
+	uint8_t *buf = (uint8_t *)k_calloc(CS_UART_BUFFER_SIZE, sizeof(uint8_t));
 	if (buf == NULL) {
 		LOG_ERR("Failed to allocate memory for uart message buffer");
 		return NULL;
 	}
 
-	// wait till at least one message is received
-	if (k_msgq_get(&_msgq_uart_msgs, &buf, K_FOREVER) == 0) {
+	// poll the message queue (no wait)
+	if (k_msgq_get(&_msgq_uart_msgs, &buf, K_NO_WAIT) == 0) {
 		return buf;
 	}
 

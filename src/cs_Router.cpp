@@ -13,6 +13,7 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 #include <zephyr/device.h>
 
 #include "cs_ReturnTypes.h"
+#include "cs_Router.h"
 #include "drivers/cs_Uart.h"
 #include "drivers/network/cs_Wifi.h"
 
@@ -34,15 +35,9 @@ int main(void)
 	}
 
 	const struct device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
-	Uart rs485(rs485_dev);
+	Uart rs485(rs485_dev, CS_SOURCE_ID_UART_RS485);
 	if (rs485.init(NULL) == CS_OK) {
 		LOG_INF("Rs485 initialized");
-	}
-
-	const struct device *rs232_dev = DEVICE_DT_GET(RS232_DEVICE);
-	Uart rs232(rs232_dev);
-	if (rs232.init(NULL) == CS_OK) {
-		LOG_INF("Rs232 initialized");
 	}
 
 	LOG_INF("Crownstone router initialized");

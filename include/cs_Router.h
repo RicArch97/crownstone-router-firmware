@@ -155,24 +155,24 @@ enum cs_router_source_type {
  * @brief Data packet uart source id's.
  */
 enum cs_router_source_uart_id {
-	CS_SOURCE_ID_RS485, // e.g. solar panel / heatpump / charging station
-	CS_SOURCE_ID_RS232, // e.g. dutch smart meter
-	CS_SOURCE_ID_CM4    // raspberry pi computer module 4 where application code runs
+	CS_SOURCE_ID_UART_RS485, // e.g. solar panel / heatpump / charging station
+	CS_SOURCE_ID_UART_RS232, // e.g. dutch smart meter
+	CS_SOURCE_ID_UART_CM4    // raspberry pi computer module 4 where application code runs
 };
 
 /**
  * @brief Data packet cloud source id's.
  */
 enum cs_router_source_cloud_id {
-	CS_SOURCE_ID_SERVER // cloud server where application code runs
+	CS_SOURCE_ID_CLOUD_SERVER // cloud server where application code runs
 };
 
 /**
  * @brief Data packet ble source id's.
  */
 enum cs_router_source_ble_id {
-	CS_SOURCE_ID_CROWNSTONE_MESH,
-	CS_SOURCE_ID_CROWNSTONE_APP // possible for wifi detail exchange?
+	CS_SOURCE_ID_BLE_CROWNSTONE_MESH,
+	CS_SOURCE_ID_BLE_CROWNSTONE_APP // possible for wifi detail exchange?
 };
 
 /**

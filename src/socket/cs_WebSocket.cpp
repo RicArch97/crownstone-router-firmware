@@ -8,21 +8,34 @@
 #include <string.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(cs_WebSocket, LOG_LEVEL_INF);
 
-#include "cs_ReturnTypes.h"
-#include "cs_Router.h"
-#include "socket/cs_WebSocket.h"
-
-#include <zephyr/kernel.h>
-#include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/websocket.h>
 
-#include <zephyr/net/tls_credentials.h>
-#include "socket/cs_CaCertificate.h"
+#include "cs_Router.h"
+#include "socket/cs_WebSocket.h"
 
 K_THREAD_STACK_DEFINE(ws_tid_stack_area, THREAD_STACK_SIZE);
+
+/**
+ * @brief Initialize websocket.
+ *
+ * @param opts Instance of @ref cs_socket_opts.
+ *
+ * @return CS_OK if the initialization was succesful.
+ */
+cs_err_t WebSocket::init(struct cs_socket_opts *opts)
+{
+	int ret = initSocket(opts);
+	if (ret != CS_OK) {
+		return ret;
+	}
+
+	_is_initialized = true;
+
+	return CS_OK;
+}
 
 /**
  * @brief Open a websocket connection.
@@ -37,6 +50,7 @@ cs_err_t WebSocket::connect(const char *url)
 	}
 
 	if (zsock_connect(_sock_id, _addr, _addr_len) < 0) {
+		LOG_ERR("Failed to connect to socket host %d", -errno);
 		return CS_ERR_SOCKET_CONNECT_FAILED;
 	}
 
@@ -52,7 +66,7 @@ cs_err_t WebSocket::connect(const char *url)
 	ws_req.tmp_buf_len = sizeof(_websocket_recv_temp_buf);
 
 	// perform http handshake for websocket connection
-	_websock_id = websocket_connect(_sock_id, &ws_req, CS_SOCKET_RECV_TIMEOUT, &_host_name);
+	_websock_id = websocket_connect(_sock_id, &ws_req, CS_WEBSOCKET_RECV_TIMEOUT, &_host_name);
 	if (_websock_id < 0) {
 		LOG_ERR("Failed to connect to websocket on %s", _host_name);
 		zsock_close(_sock_id);
@@ -107,7 +121,7 @@ void WebSocket::handleTransport(void *cls, void *unused1, void *unused2)
 						 &message_type, &remaining, 0);
 			if (ret <= 0) {
 				if (ret == -EAGAIN) {
-					k_sleep(K_MSEC(CS_SOCKET_RECV_RETRY_TIMOUT));
+					k_sleep(K_MSEC(CS_WEBSOCKET_RECV_RETRY_TIMOUT));
 					continue;
 				}
 				LOG_DBG("Websocket connection closed while waiting (%d/%d)", ret,
@@ -128,7 +142,7 @@ void WebSocket::handleTransport(void *cls, void *unused1, void *unused2)
 /**
  * @brief Close websocket & BSD socket.
  */
-cs_err_t WebSocket::disconnect()
+cs_err_t WebSocket::close()
 {
 	if (!_is_initialized) {
 		LOG_ERR("Not initialized");
@@ -138,44 +152,7 @@ cs_err_t WebSocket::disconnect()
 	if (_websock_id >= 0) {
 		websocket_disconnect(_websock_id);
 	}
-	if (_sock_id >= 0) {
-		zsock_close(_sock_id);
-	}
-
-	return CS_OK;
-}
-
-/**
- * @brief Send a HTTP request over a socket.
- *
- * @param method One of @ref http_method, e.g. HTTP_GET, HTTP_POST
- * @param endpoint Endpoint / url of the request
- * @param payload Payload that should be send to the server, only for POST, otherwise NULL
- */
-cs_err_t WebSocket::sendHttpRequest(enum http_method method, const char *endpoint,
-				    const char *payload)
-{
-	struct http_request http_req;
-	memset(&http_req, 0, sizeof(http_req));
-
-	char url_prefix[] = "/";
-
-	http_req.method = method;
-	http_req.url = strcat("/", endpoint);
-	http_req.host = _host_name;
-	http_req.protocol = HTTP_PROTOCOL_VER;
-	http_req.recv_buf = _socket_recv_buf;
-	http_req.recv_buf_len = CS_SOCKET_RECV_BUF_SIZE;
-
-	if (method == HTTP_POST && payload != NULL) {
-		http_req.payload = payload;
-		http_req.payload_len = strlen(payload);
-	}
-
-	if (http_client_req(_sock_id, &http_req, CS_SOCKET_RECV_TIMEOUT, this) < 0) {
-		LOG_ERR("Failed to send http POST request");
-		return CS_ERR_SOCKET_HTTP_GET_FAILED;
-	}
+	closeSocket();
 
 	return CS_OK;
 }
