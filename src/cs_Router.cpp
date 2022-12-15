@@ -5,8 +5,6 @@
  * License: Apache License 2.0
  */
 
-#include <string.h>
-
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 

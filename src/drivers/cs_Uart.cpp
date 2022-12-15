@@ -5,7 +5,7 @@
  * License: Apache License 2.0
  */
 
-#include <errno.h>
+#include <string.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);

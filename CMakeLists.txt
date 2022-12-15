@@ -12,4 +12,3 @@ FILE(GLOB app_sources_network src/drivers/network/*.cpp)
 
 target_sources(app PRIVATE ${app_sources} ${app_sources_drivers} ${app_sources_socket} ${app_sources_network})
 target_include_directories(app PRIVATE include/)
-target_compile_options(app PRIVATE -fno-threadsafe-statics)

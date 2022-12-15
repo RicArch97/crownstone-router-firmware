@@ -8,6 +8,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/net/http/client.h>
