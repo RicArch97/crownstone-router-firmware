@@ -11,21 +11,24 @@
 
 #include "cs_ReturnTypes.h"
 
+#define CS_PROTOCOL_VERSION 1
+#define CS_UART_PROTOCOL_VERSION 1
+
 /**
  * @brief Frame struct for an UART Crownstone router communication packet.
  * Used for local communication.
  *
  * @param start_token Start token for a message
- * @param protocol_version Uart protocol version
  * @param length Length of all data beyond this field, including CRC
+ * @param protocol_version Uart protocol version
  * @param type Frame type
  * @param payload Payload containing a Crownstone router packet
- * @param crc CRC16 of the payload
+ * @param crc CRC16 of everything after length
  */
 struct cs_router_uart_packet {
 	uint8_t start_token;
-	uint8_t protocol_version;
 	uint16_t length;
+	uint8_t protocol_version;
 	uint8_t type;
 	uint8_t *payload;
 	uint16_t crc;

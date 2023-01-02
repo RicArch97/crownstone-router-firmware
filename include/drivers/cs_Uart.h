@@ -22,6 +22,11 @@
 #define CS_UART_RS_BAUD_MAX	115200
 #define CS_UART_RS_BAUD_DEFAULT 9600
 
+// signals start of a message
+#define CS_UART_CM4_START_TOKEN 0x7E
+// crc start value
+#define CS_UART_CM4_CRC_SEED 0xFFFF
+
 #define CS_UART_BUFFER_SIZE	  256
 #define CS_UART_BUFFER_QUEUE_SIZE 10
 
@@ -72,12 +77,13 @@ public:
 
 	cs_err_t init(struct cs_uart_config *cfg);
 	void sendUartMessage(uint8_t *msg, int len);
-	uint8_t *getUartMessage();
 	void disable();
 
 private:
 	static void handleUartInterrupt(const struct device *dev, void *user_data);
-	uint8_t *createUartPacket();
+	static void uartManager(void *cls, void *unused1, void *unused2);
+	uint8_t *wrapUartMessage(uint8_t *message);
+	void handleUartPacket(uint8_t *packet);
 
 	bool _is_initialized = false;
 	const struct device *_uart_dev = NULL;

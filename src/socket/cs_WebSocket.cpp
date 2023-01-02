@@ -17,7 +17,7 @@ LOG_MODULE_REGISTER(cs_WebSocket, LOG_LEVEL_INF);
 #include "cs_Router.h"
 #include "socket/cs_WebSocket.h"
 
-K_THREAD_STACK_DEFINE(ws_tid_stack_area, THREAD_STACK_SIZE);
+K_THREAD_STACK_DEFINE(ws_tid_stack_area, CS_WEBSOCKET_THREAD_STACK_SIZE);
 
 /**
  * @brief Initialize websocket.
@@ -78,7 +78,7 @@ cs_err_t WebSocket::connect(const char *url)
 	struct k_thread ws_tid;
 	k_tid_t ws_thread = k_thread_create(
 		&ws_tid, ws_tid_stack_area, K_THREAD_STACK_SIZEOF(ws_tid_stack_area),
-		handleTransport, this, NULL, NULL, THREAD_PRIORITY, 0, K_NO_WAIT);
+		handleTransport, this, NULL, NULL, CS_WEBSOCKET_THREAD_PRIORITY, 0, K_NO_WAIT);
 
 	LOG_INF("Opened websocket connection on %s/%s", _host_name, url);
 
@@ -98,6 +98,10 @@ cs_err_t WebSocket::handleWebsocketConnect(int sock, struct http_request *req, v
 /**
  * @brief Handle transport on the websocket.
  * Runs in a dedicated thread.
+ * 
+ * @param cls Pointer to the class instance.
+ * @param unused1 Unused parameter, is NULL.
+ * @param unused2 Unused parameter, is NULL.
  */
 void WebSocket::handleTransport(void *cls, void *unused1, void *unused2)
 {
@@ -136,7 +140,7 @@ void WebSocket::handleTransport(void *cls, void *unused1, void *unused2)
 		LOG_DBG("Received %d bytes", total_read);
 
 		// sleep and yield cpu to other threads
-		k_sleep(K_MSEC(THREAD_SLEEP));
+		k_sleep(K_MSEC(CS_WEBSOCKET_THREAD_SLEEP));
 	}
 }
 

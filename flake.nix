@@ -167,6 +167,7 @@
             gcc_multi
             SDL2
             pyocd
+            clang-tools
             zephyrDeps
             zephyrSdk
             zephyrRules
