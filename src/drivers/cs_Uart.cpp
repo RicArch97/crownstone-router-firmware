@@ -338,9 +338,7 @@ int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 /**
  * @brief Handle UART packet received from CM4.
  *
- * @param Packet Pointer to the packet buffer.
- *
- * @return CS_OK if the packet was handled successfully, else CS_FAIL.
+ * @param packet Pointer to the packet buffer.
  */
 void Uart::handleUartPacket(uint8_t *packet)
 {

@@ -25,10 +25,10 @@ static struct k_mutex mtx;
  */
 void HttpClient::init(struct cs_socket_opts *opts)
 {
-  k_mutex_init(&mtx);
-  _opts = opts;
+	k_mutex_init(&mtx);
+	_opts = opts;
 
-  _is_initialized = true;
+	_is_initialized = true;
 }
 
 /**
@@ -41,21 +41,21 @@ void HttpClient::init(struct cs_socket_opts *opts)
 cs_err_t HttpClient::sendHttpRequest(enum http_method method, const char *endpoint,
 				     const char *payload)
 {
-  if (!_is_initialized) {
+	if (!_is_initialized) {
 		LOG_ERR("Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}
 
-  // make sure only 1 request has access to the socket
-  k_mutex_lock(&mtx, K_FOREVER);
+	// make sure only 1 request has access to the socket
+	k_mutex_lock(&mtx, K_FOREVER);
 
-  // create new socket for the request
-  cs_err_t ret = initSocket(_opts);
-  if (ret != CS_OK) {
-    return ret;
-  }
+	// create new socket for the request
+	cs_err_t ret = initSocket(_opts);
+	if (ret != CS_OK) {
+		return ret;
+	}
 
-  if (zsock_connect(_sock_id, _addr, _addr_len) < 0) {
+	if (zsock_connect(_sock_id, _addr, _addr_len) < 0) {
 		LOG_ERR("Failed to connect to socket host %d", -errno);
 		return CS_ERR_SOCKET_CONNECT_FAILED;
 	}
@@ -77,14 +77,15 @@ cs_err_t HttpClient::sendHttpRequest(enum http_method method, const char *endpoi
 		http_req.payload_len = strlen(payload);
 	}
 
-	if (http_client_req(_sock_id, &http_req, CS_HTTP_CLIENT_RECV_TIMEOUT, (char*)endpoint) < 0) {
+	if (http_client_req(_sock_id, &http_req, CS_HTTP_CLIENT_RECV_TIMEOUT, (char *)endpoint) <
+	    0) {
 		LOG_ERR("Failed to send http POST request");
 		return CS_ERR_SOCKET_HTTP_GET_FAILED;
 	}
 
-  closeSocket();
+	closeSocket();
 
-  k_mutex_unlock(&mtx);
+	k_mutex_unlock(&mtx);
 
 	return CS_OK;
 }
@@ -98,5 +99,6 @@ void HttpClient::handleHttpResponse(struct http_response *rsp, enum http_final_c
 		LOG_DBG("Received http data (%zd bytes)", rsp->data_len);
 	}
 
-	LOG_INF("Request to endpoint %s got response status %s", (char*)user_data, rsp->http_status);
+	LOG_INF("Request to endpoint %s got response status %s", (char *)user_data,
+		rsp->http_status);
 }

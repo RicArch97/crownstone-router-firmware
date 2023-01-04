@@ -38,7 +38,7 @@ private:
 				       void *user_data);
 
 	bool _is_initialized = false;
-	
+
 	struct cs_socket_opts *_opts = NULL;
 	uint8_t _http_recv_buf[CS_HTTP_CLIENT_RECV_BUF_SIZE];
 };
