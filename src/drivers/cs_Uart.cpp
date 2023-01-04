@@ -16,11 +16,13 @@ LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);
 #include "cs_ReturnTypes.h"
 #include "drivers/cs_Uart.h"
 
+K_THREAD_STACK_DEFINE(uart_tid_stack_area, CS_UART_THREAD_STACK_SIZE);
+
 /**
  * @brief Initialize the UART module.
  *
- * @param cfg Optional struct with the mode, custom baudrate, parity and stop bits.
- * when NULL is provided, raw mode and 9600,8,n,1 is used.
+ * @param cfg Optional struct with custom baudrate, parity and stop bits.
+ * when NULL is provided, 9600,8,n,1 is used.
  *
  * @return CS_OK if the UART module was sucessfully initialized.
  */
@@ -43,45 +45,36 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 	uart_cfg.data_bits = UART_CFG_DATA_BITS_8;
 
 	if (cfg == NULL) {
-		_uart_mode = CS_UART_MODE_RAW;
-
 		uart_cfg.baudrate = CS_UART_RS_BAUD_DEFAULT;
 		uart_cfg.parity = UART_CFG_PARITY_NONE;
 		uart_cfg.stop_bits = UART_CFG_STOP_BITS_1;
 	} else {
-		switch (cfg->mode) {
-		case CS_UART_MODE_RAW:
+		if (_src_id == CS_SOURCE_ID_UART_CM4) {
+			// CM4 UART connection is not using any RS protocol, so not constrained
+			uart_cfg.baudrate = cfg->baudrate;
+			uart_cfg.parity = cfg->parity;
+			uart_cfg.stop_bits = cfg->stop_bits;
+		} else {
 			// according to RS485 and RS232 spec, baudrate between 110 and 115200
-			uart_cfg.baudrate = CLAMP(cfg->serial_cfg.baudrate, CS_UART_RS_BAUD_MIN,
-						  CS_UART_RS_BAUD_MAX);
+			uart_cfg.baudrate =
+				CLAMP(cfg->baudrate, CS_UART_RS_BAUD_MIN, CS_UART_RS_BAUD_MAX);
 
 			// use a total of 11 bits
-			switch (cfg->serial_cfg.parity) {
+			switch (cfg->parity) {
 			case UART_CFG_PARITY_ODD:
 			case UART_CFG_PARITY_EVEN:
-				uart_cfg.parity = cfg->serial_cfg.parity;
+				uart_cfg.parity = cfg->parity;
 				uart_cfg.stop_bits = UART_CFG_STOP_BITS_1;
 				break;
 			case UART_CFG_PARITY_NONE:
-				uart_cfg.parity = cfg->serial_cfg.parity;
-				uart_cfg.stop_bits = cfg->serial_cfg.stop_bits;
+				uart_cfg.parity = cfg->parity;
+				uart_cfg.stop_bits = cfg->stop_bits;
 				break;
 			default:
 				LOG_ERR("Invalid parity bit option provided");
 				return CS_ERR_UART_CONFIG_INVALID;
 			}
-			break;
-		case CS_UART_MODE_PACKETS:
-			uart_cfg.baudrate = cfg->serial_cfg.baudrate;
-			uart_cfg.parity = cfg->serial_cfg.parity;
-			uart_cfg.stop_bits = cfg->serial_cfg.stop_bits;
-			break;
-		default:
-			LOG_ERR("Invalid uart mode provided");
-			return CS_ERR_UART_CONFIG_INVALID;
 		}
-
-		_uart_mode = cfg->mode;
 	}
 
 	if (uart_configure(_uart_dev, &uart_cfg) != 0) {
@@ -100,6 +93,12 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 	// start listening on RX
 	uart_irq_rx_enable(_uart_dev);
 
+	struct k_thread uart_tid;
+	// create thread for handling uart messages and packets
+	k_tid_t uart_thread = k_thread_create(
+		&uart_tid, uart_tid_stack_area, K_THREAD_STACK_SIZEOF(uart_tid_stack_area),
+		handleUartMessages, this, NULL, NULL, CS_UART_THREAD_PRIORITY, 0, K_NO_WAIT);
+
 	_is_initialized = true;
 
 	return CS_OK;
@@ -111,12 +110,12 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
  * @param msg Pointer to the buffer with the message data.
  * @param len Length of the message data.
  */
-void Uart::sendUartMessage(uint8_t *msg, int len)
+void Uart::sendUartMessage(uint8_t *msg, size_t len)
 {
 	if (_uart_tx_buf != NULL) {
 		k_free(_uart_tx_buf);
 	}
-	_uart_tx_buf = (uint8_t *)k_calloc(len, sizeof(uint8_t));
+	_uart_tx_buf = (uint8_t *)k_malloc(len * sizeof(uint8_t));
 
 	memcpy(_uart_tx_buf, msg, len);
 	_uart_tx_buf_ctr = len;
@@ -163,6 +162,11 @@ void Uart::handleUartInterrupt(const struct device *dev, void *user_data)
 			// terminate string
 			uart_inst->_uart_rx_buf[uart_inst->_uart_rx_buf_ctr] = '\0';
 
+			// if queue is full, something may have gone wrong
+			// save newer messages and discard the older onces
+			if (k_msgq_num_free_get(&uart_inst->_msgq_uart_msgs) == 0) {
+				k_msgq_purge(&uart_inst->_msgq_uart_msgs);
+			}
 			// add to message queue, this copies the data to ring buffer
 			k_msgq_put(&uart_inst->_msgq_uart_msgs, &uart_inst->_uart_rx_buf,
 				   K_NO_WAIT);
@@ -200,7 +204,7 @@ void Uart::handleUartInterrupt(const struct device *dev, void *user_data)
  * @param unused1 Unused parameter, is NULL.
  * @param unused2 Unused parameter, is NULL.
  */
-void Uart::uartManager(void *cls, void *unused1, void *unused2)
+void Uart::handleUartMessages(void *cls, void *unused1, void *unused2)
 {
 	Uart *uart_inst = (Uart *)cls;
 
@@ -209,31 +213,56 @@ void Uart::uartManager(void *cls, void *unused1, void *unused2)
 		return;
 	}
 
+	struct k_sem ws_sem;
+	if (uart_inst->_ws_inst != NULL) {
+		k_sem_init(&ws_sem, 1, 1);
+	}
+
+	uint8_t pkt_buf[CS_UART_PACKET_BUF_SIZE];
+
 	while (1) {
-		// check if there are messages in the queue
+		// sleep if there are no messages in queue and skip the rest of the statements
 		if (k_msgq_num_used_get(&uart_inst->_msgq_uart_msgs) == 0) {
+			k_sleep(K_MSEC(CS_UART_THREAD_SLEEP));
+			continue;
+		}
+		// reiterate if sempahore not available, don't take anything out of the queue
+		if ((uart_inst->_ws_inst != NULL) && (k_sem_take(&ws_sem, K_NO_WAIT) != 0)) {
+			k_sleep(K_MSEC(CS_UART_THREAD_SLEEP));
 			continue;
 		}
 
-		uint8_t *buf = (uint8_t *)k_malloc(CS_UART_BUFFER_SIZE * sizeof(uint8_t));
-		if (buf == NULL) {
+		uint8_t *msg = (uint8_t *)k_malloc(CS_UART_BUFFER_SIZE * sizeof(uint8_t));
+		if (msg == NULL) {
 			LOG_ERR("Failed to allocate memory for uart message buffer");
 			break;
 		}
 
 		// poll the message queue (no wait)
-		if (k_msgq_get(&uart_inst->_msgq_uart_msgs, &buf, K_NO_WAIT) != 0) {
-			// packet sent from CM4 start with a specific token
-			if (buf[0] == CS_UART_CM4_START_TOKEN) {
-				uart_inst->handleUartPacket(buf);
+		if (k_msgq_get(&uart_inst->_msgq_uart_msgs, &msg, K_NO_WAIT) != 0) {
+			// packet sent from CM4 start with a specific token, handle the packet
+			if (msg[0] == CS_UART_CM4_START_TOKEN) {
+				uart_inst->handleUartPacket(msg);
 			} else {
-				uint8_t *packet = uart_inst->wrapUartMessage(buf);
-
-				// TODO: mailbox for synchronization with websocket thread?
+				int wrap_ret = uart_inst->wrapUartMessage(msg, pkt_buf);
+				if (wrap_ret < 0) {
+					break;
+				}
+				// pass packet according to given method
+				if (uart_inst->_uart_inst != NULL) {
+					uart_inst->_uart_inst->sendUartMessage(pkt_buf, wrap_ret);
+				} else if (uart_inst->_ws_inst != NULL) {
+					uart_inst->_ws_inst->sendMessage(pkt_buf, wrap_ret,
+									 &ws_sem);
+				} else {
+					// for testing
+					// data is passed through, just log packet contents
+					LOG_HEXDUMP_DBG(pkt_buf, (uint32_t)wrap_ret, "uart_packet");
+				}
 			}
 		}
 
-		k_sleep(K_MSEC(200));
+		k_sleep(K_MSEC(CS_UART_THREAD_SLEEP));
 	}
 }
 
@@ -242,12 +271,10 @@ void Uart::uartManager(void *cls, void *unused1, void *unused2)
  *
  * @param message Pointer to UART message buffer.
  *
- * @return Heap allocated pointer to packet buffer if successful, else NULL.
+ * @return Size of the packet on success, <0 on fail.
  */
-uint8_t *Uart::wrapUartMessage(uint8_t *message)
+int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 {
-	LOG_DBG("Wrapping raw data %s into packet", message);
-
 	// buffer is string terminated, might be shorter than 256 on newline
 	int payload_len = strlen((char *)message);
 	int data_pkt_len = (sizeof(cs_router_data_packet) - sizeof(uint8_t *)) + payload_len;
@@ -255,7 +282,7 @@ uint8_t *Uart::wrapUartMessage(uint8_t *message)
 	if (data_pkt == NULL) {
 		LOG_ERR("Failed to allocate memory for data packet");
 		k_free(message);
-		return NULL;
+		return CS_FAIL;
 	}
 
 	data_pkt[0] = CS_SOURCE_TYPE_UART;
@@ -269,7 +296,7 @@ uint8_t *Uart::wrapUartMessage(uint8_t *message)
 	if (generic_pkt == NULL) {
 		LOG_ERR("Failed to allocate memory for generic packet");
 		k_free(data_pkt);
-		return NULL;
+		return CS_FAIL;
 	}
 
 	generic_pkt[0] = CS_PROTOCOL_VERSION;
@@ -278,37 +305,34 @@ uint8_t *Uart::wrapUartMessage(uint8_t *message)
 	memcpy(generic_pkt + 4, data_pkt, data_pkt_len);
 	k_free(data_pkt);
 
-	// if data should be send to the CM4 over UART, wrap into UART packet
-	if (_src_id == CS_SOURCE_ID_UART_CM4) {
+	// if Uart instance is given, packets should be send over UART. Wrap into UART packet.
+	if (_uart_inst != NULL) {
 		int uart_pkt_len =
 			(sizeof(cs_router_uart_packet) - sizeof(uint8_t *)) + generic_pkt_len;
-		uint8_t *uart_pkt = (uint8_t *)k_malloc(uart_pkt_len * sizeof(uint8_t));
-		if (uart_pkt == NULL) {
-			LOG_ERR("Failed to allocate memory for uart packet");
-			k_free(generic_pkt);
-			return NULL;
-		}
 
 		int uart_pkt_ctr = 0;
 
-		uart_pkt[uart_pkt_ctr++] = CS_UART_CM4_START_TOKEN;
-		sys_put_le16(uart_pkt_len - 3, uart_pkt + uart_pkt_ctr);
+		pkt_buf[uart_pkt_ctr++] = CS_UART_CM4_START_TOKEN;
+		sys_put_le16(uart_pkt_len - 3, pkt_buf + uart_pkt_ctr);
 		uart_pkt_ctr += 2;
-		uart_pkt[uart_pkt_ctr++] = CS_UART_PROTOCOL_VERSION;
-		uart_pkt[uart_pkt_ctr++] = CS_PACKET_TYPE_GENERIC;
-		memcpy(uart_pkt + uart_pkt_ctr, generic_pkt, generic_pkt_len);
+		pkt_buf[uart_pkt_ctr++] = CS_UART_PROTOCOL_VERSION;
+		pkt_buf[uart_pkt_ctr++] = CS_PACKET_TYPE_GENERIC;
+		memcpy(pkt_buf + uart_pkt_ctr, generic_pkt, generic_pkt_len);
 		uart_pkt_ctr += generic_pkt_len;
 		k_free(generic_pkt);
 
 		// calculate CRC16 CCITT over everything after length (so
 		// don't include start token and length)
-		uint16_t crc = crc16_ccitt(CS_UART_CM4_CRC_SEED, uart_pkt + 3, uart_pkt_ctr - 3);
-		sys_put_le16(crc, uart_pkt + uart_pkt_ctr);
+		uint16_t crc = crc16_ccitt(CS_UART_CM4_CRC_SEED, pkt_buf + 3, uart_pkt_ctr - 3);
+		sys_put_le16(crc, pkt_buf + uart_pkt_ctr);
 
-		return uart_pkt;
+		return uart_pkt_len;
 	}
 
-	return generic_pkt;
+	memcpy(pkt_buf, generic_pkt, generic_pkt_len);
+	k_free(generic_pkt);
+
+	return generic_pkt_len;
 }
 
 /**
@@ -320,8 +344,6 @@ uint8_t *Uart::wrapUartMessage(uint8_t *message)
  */
 void Uart::handleUartPacket(uint8_t *packet)
 {
-	LOG_DBG("Received UART packet from CM4 %s", packet);
-
 	int uart_pkt_cm4_ctr = 0;
 
 	struct cs_router_uart_packet uart_pkt_cm4;

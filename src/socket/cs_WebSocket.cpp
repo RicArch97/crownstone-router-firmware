@@ -6,6 +6,7 @@
  */
 
 #include <string.h>
+#include <errno.h>
 #include <climits>
 
 #include <zephyr/logging/log.h>
@@ -32,6 +33,8 @@ cs_err_t WebSocket::init(struct cs_socket_opts *opts)
 	if (ret != CS_OK) {
 		return ret;
 	}
+
+	k_mbox_init(&_ws_mbox);
 
 	_is_initialized = true;
 
@@ -76,13 +79,34 @@ cs_err_t WebSocket::connect(const char *url)
 
 	// handle sending and receiving in a thread
 	struct k_thread ws_tid;
-	k_tid_t ws_thread = k_thread_create(
-		&ws_tid, ws_tid_stack_area, K_THREAD_STACK_SIZEOF(ws_tid_stack_area),
-		handleTransport, this, NULL, NULL, CS_WEBSOCKET_THREAD_PRIORITY, 0, K_NO_WAIT);
+	_ws_thread = k_thread_create(&ws_tid, ws_tid_stack_area,
+				     K_THREAD_STACK_SIZEOF(ws_tid_stack_area), handleTransport,
+				     this, NULL, NULL, CS_WEBSOCKET_THREAD_PRIORITY, 0, K_NO_WAIT);
 
 	LOG_INF("Opened websocket connection on %s/%s", _host_name, url);
 
 	return CS_OK;
+}
+
+/**
+ * @brief Send message over websocket asynchronously by putting it in a mailbox.
+ *
+ * @param message Pointer to buffer with the message.
+ * @param len Length of the message.
+ * @param sem Optional pointer to a semaphore that will be given when the message has been received.
+ * NULL if not needed.
+ */
+void WebSocket::sendMessage(uint8_t *message, size_t len, struct k_sem *sem)
+{
+	struct k_mbox_msg send_msg;
+
+	send_msg.info = len;
+	send_msg.size = len;
+	send_msg.tx_data = message;
+	send_msg.tx_block.data = NULL;
+	send_msg.tx_target_thread = _ws_thread;
+
+	k_mbox_async_put(&_ws_mbox, &send_msg, sem);
 }
 
 /**
@@ -98,7 +122,7 @@ cs_err_t WebSocket::handleWebsocketConnect(int sock, struct http_request *req, v
 /**
  * @brief Handle transport on the websocket.
  * Runs in a dedicated thread.
- * 
+ *
  * @param cls Pointer to the class instance.
  * @param unused1 Unused parameter, is NULL.
  * @param unused2 Unused parameter, is NULL.
@@ -107,39 +131,65 @@ void WebSocket::handleTransport(void *cls, void *unused1, void *unused2)
 {
 	WebSocket *ws_obj = (WebSocket *)cls;
 
+	struct k_mbox_msg driver_msg;
+	driver_msg.info = CS_WEBSOCKET_MBOX_BUF_SIZE;
+	driver_msg.size = CS_WEBSOCKET_MBOX_BUF_SIZE;
+	driver_msg.rx_source_thread = K_ANY;
+	
+	uint8_t driver_msg_buf[CS_WEBSOCKET_MBOX_BUF_SIZE];
+
 	while (1) {
 		if (ws_obj->_sock_id < 0 || ws_obj->_websock_id < 0) {
 			break;
 		}
 
-		// check events for UART RS / BLE data received
-		// TODO send packets
+		// get message from mailbox if available (don't block)
+		if (k_mbox_get(&ws_obj->_ws_mbox, &driver_msg, driver_msg_buf, K_NO_WAIT) == 0) {
+			// size is updated after message is retrieved
+			if (driver_msg.info != driver_msg.size) {
+				LOG_WRN("Data dropped when retrieving data from mailbox, %d bytes "
+					"were sent, max is %d",
+					driver_msg.info, CS_WEBSOCKET_MBOX_BUF_SIZE);
+			}
 
-		int ret, read_pos = 0, total_read = 0;
+			// a message is available, make sure it is sent over the websocket
+			int send_ret = websocket_send_msg(
+				ws_obj->_websock_id, driver_msg_buf, driver_msg.size,
+				WEBSOCKET_OPCODE_DATA_TEXT, true, true, SYS_FOREVER_MS);
+			if (send_ret < 0) {
+				LOG_ERR("Error: %s occured while trying to send message over "
+					"websocket",
+					strerror(send_ret));
+			}
+
+			LOG_DBG("Sent %d bytes", send_ret);
+		}
+
+		int recv_ret, read_pos = 0, total_read = 0;
 		uint32_t message_type;
 		uint64_t remaining = ULLONG_MAX;
 		// receive data if available, don't block until it is
 		while (remaining > 0) {
-			ret = websocket_recv_msg(ws_obj->_websock_id,
-						 (ws_obj->_websocket_recv_buf + read_pos),
-						 (sizeof(ws_obj->_websocket_recv_buf) - read_pos),
-						 &message_type, &remaining, 0);
-			if (ret <= 0) {
-				if (ret == -EAGAIN) {
+			recv_ret = websocket_recv_msg(
+				ws_obj->_websock_id, (ws_obj->_websocket_recv_buf + read_pos),
+				(sizeof(ws_obj->_websocket_recv_buf) - read_pos), &message_type,
+				&remaining, 0);
+			if (recv_ret < 0) {
+				if (recv_ret == -EAGAIN) {
 					k_sleep(K_MSEC(CS_WEBSOCKET_RECV_RETRY_TIMOUT));
 					continue;
 				}
-				LOG_DBG("Websocket connection closed while waiting (%d/%d)", ret,
-					errno);
+				LOG_DBG("Websocket connection closed while waiting (%d/%d)",
+					recv_ret, errno);
 				break;
 			}
-			read_pos += ret;
-			total_read += ret;
+			read_pos += recv_ret;
+			total_read += recv_ret;
 		}
 
 		LOG_DBG("Received %d bytes", total_read);
 
-		// sleep and yield cpu to other threads
+		// sleep for 100 ms to yield control to other threads
 		k_sleep(K_MSEC(CS_WEBSOCKET_THREAD_SLEEP));
 	}
 }
