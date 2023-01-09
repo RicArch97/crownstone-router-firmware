@@ -5,28 +5,109 @@
  * License: Apache License 2.0
  */
 
-#include <string.h>
+#include "drivers/cs_Wifi.h"
+#include "cs_ReturnTypes.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(cs_Network, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(cs_Wifi, LOG_LEVEL_DBG);
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/sys/util.h>
 
-#include "cs_ReturnTypes.h"
-#include "drivers/network/cs_Wifi.h"
+#include <string.h>
 
 #define WIFI_MODULE DT_NODELABEL(wifi)
 #define WIFI_MGMT_EVENTS                                                                           \
 	(NET_EVENT_WIFI_SCAN_RESULT | NET_EVENT_WIFI_SCAN_DONE | NET_EVENT_WIFI_CONNECT_RESULT |   \
 	 NET_EVENT_WIFI_DISCONNECT_RESULT)
 
-static struct k_event evt_ssid_found;
+/**
+ * @brief Handle wifi scan result.
+ */
+static void handleWifiScanResult(struct net_mgmt_event_callback *cb)
+{
+	const struct wifi_scan_result *entry = (const struct wifi_scan_result *)cb->info;
+
+	// get singleton instance
+	Wifi *wifi_inst = &Wifi::getInstance();
+
+	if (memcmp(wifi_inst->_ssid, entry->ssid, wifi_inst->_ssid_len) == 0) {
+		wifi_inst->_cnx_params.security = entry->security;
+		wifi_inst->_cnx_params.band = entry->band;
+		wifi_inst->_cnx_params.channel = entry->channel;
+		wifi_inst->_cnx_params.mfp = entry->mfp;
+
+		// post event once given ssid was matched
+		k_event_set(&wifi_inst->_evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT);
+	}
+}
+
+/**
+ * @brief Handle wifi connect result.
+ */
+static void handleWifiConnectionResult(struct net_mgmt_event_callback *cb)
+{
+	const struct wifi_status *status = (const struct wifi_status *)cb->info;
+
+	// get singleton instance
+	Wifi *wifi_inst = &Wifi::getInstance();
+
+	if (status->status) {
+		LOG_ERR("Connection request failed (%d)", status->status);
+	} else {
+		k_event_set(&wifi_inst->_evt_connected, CS_WIFI_CONNECTED_EVENT);
+		LOG_INF("Connected");
+	}
+}
+
+/** 
+ * @brief Handle wifi disconnect result.
+*/
+static void handleWifiDisconnectionResult(struct net_mgmt_event_callback *cb)
+{
+	const struct wifi_status *status = (const struct wifi_status *)cb->info;
+
+	// get singleton instance
+	Wifi *wifi_inst = &Wifi::getInstance();
+
+	if (wifi_inst->_disconnecting) {
+		if (status->status) {
+			LOG_ERR("Disconnection request failed (%d)", status->status);
+		}
+		else {
+			LOG_INF("Disconnection request done (%d)", status->status);
+		}
+	}
+	else {
+		LOG_INF("Disconnected");
+	}
+}
+
+/**
+ * @brief Handle wifi events.
+ */
+static void handleWifiResult(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+			     struct net_if *iface)
+{
+	switch (mgmt_event) {
+	case NET_EVENT_WIFI_SCAN_RESULT:
+		handleWifiScanResult(cb);
+		break;
+	case NET_EVENT_WIFI_CONNECT_RESULT:
+		handleWifiConnectionResult(cb);
+		break;
+	case NET_EVENT_WIFI_DISCONNECT_RESULT:
+		handleWifiDisconnectionResult(cb);
+		break;
+	default:
+		break;
+	}
+}
 
 /**
  * @brief Initialize the wifi module.
- * 
+ *
  * @param ssid SSID of the Wifi network.
  * @param psk Passkey of the Wifi network.
  *
@@ -34,7 +115,7 @@ static struct k_event evt_ssid_found;
  */
 cs_err_t Wifi::init(const char *ssid, const char *psk)
 {
-	if (_is_initialized) {
+	if (_initialized) {
 		LOG_ERR("Already initialized");
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
@@ -58,8 +139,9 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
 	net_mgmt_init_event_callback(&wifi_mgmt_cb, handleWifiResult, WIFI_MGMT_EVENTS);
 	net_mgmt_add_event_callback(&wifi_mgmt_cb);
 
-	// init ssid found event
-	k_event_init(&evt_ssid_found);
+	// init ssid found event and connected event
+	k_event_init(&_evt_ssid_found);
+	k_event_init(&_evt_connected);
 
 	// clamp lengths to the max supported
 	_ssid_len = (uint8_t)CLAMP(strlen(ssid), 0, WIFI_SSID_MAX_LEN);
@@ -68,7 +150,7 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
 	memcpy(_ssid, (uint8_t *)ssid, _ssid_len);
 	memcpy(_psk, (uint8_t *)psk, _psk_len);
 
-	_is_initialized = true;
+	_initialized = true;
 
 	return CS_OK;
 }
@@ -80,7 +162,7 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
  */
 cs_err_t Wifi::connect()
 {
-	if (!_is_initialized) {
+	if (!_initialized) {
 		LOG_ERR("Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}
@@ -92,7 +174,7 @@ cs_err_t Wifi::connect()
 
 	// it's possible the scan did not detect the given ssid
 	// return so connection can be reattempted
-	if (k_event_wait(&evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT, true,
+	if (k_event_wait(&_evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT, true,
 			 K_MSEC(CS_WIFI_SCAN_TIMEOUT)) == 0) {
 		LOG_ERR("Timeout on waiting for scan result");
 		return CS_ERR_WIFI_SCAN_RESULT_TIMEOUT;
@@ -124,66 +206,12 @@ cs_err_t Wifi::connect()
  */
 cs_err_t Wifi::disconnect()
 {
+	_disconnecting = true;
+
 	if (net_mgmt(NET_REQUEST_WIFI_DISCONNECT, _iface, NULL, 0) != 0) {
 		LOG_ERR("Disconnect request failed");
 		return CS_ERR_WIFI_DISCONNECT_REQUEST_FAILED;
 	}
 
 	return CS_OK;
-}
-
-/**
- * @brief Handle wifi events.
- */
-void Wifi::handleWifiResult(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
-			    struct net_if *iface)
-{
-	switch (mgmt_event) {
-	case NET_EVENT_WIFI_SCAN_RESULT:
-		handleWifiScanResult(cb);
-		break;
-	case NET_EVENT_WIFI_CONNECT_RESULT:
-		handleWifiConnectionResult(cb, false);
-		break;
-	case NET_EVENT_WIFI_DISCONNECT_RESULT:
-		handleWifiConnectionResult(cb, true);
-		break;
-	default:
-		break;
-	}
-}
-
-/**
- * @brief Handle wifi scan result.
- */
-void Wifi::handleWifiScanResult(struct net_mgmt_event_callback *cb)
-{
-	const struct wifi_scan_result *entry = (const struct wifi_scan_result *)cb->info;
-
-	Wifi *wifi = &Wifi::getInstance();
-
-	if (memcmp(wifi->_ssid, entry->ssid, wifi->_ssid_len) == 0) {
-		wifi->_cnx_params.security = entry->security;
-		wifi->_cnx_params.band = entry->band;
-		wifi->_cnx_params.channel = entry->channel;
-		wifi->_cnx_params.mfp = entry->mfp;
-
-		// post event once given ssid was matched
-		k_event_post(&evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT);
-	}
-}
-
-/**
- * @brief Handle wifi connect result.
- */
-void Wifi::handleWifiConnectionResult(struct net_mgmt_event_callback *cb, bool disconnect)
-{
-	const struct wifi_status *status = (const struct wifi_status *)cb->info;
-	const char *msg = disconnect ? "Disconnection" : "Connection";
-
-	if (status->status) {
-		LOG_ERR("%s unsuccesful", msg);
-	} else {
-		LOG_INF("%s succussful!", msg);
-	}
 }

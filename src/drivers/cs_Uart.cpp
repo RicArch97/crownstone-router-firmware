@@ -5,18 +5,131 @@
  * License: Apache License 2.0
  */
 
-#include <string.h>
+#include "drivers/cs_Uart.h"
+#include "cs_ReturnTypes.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_DBG);
 
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/crc.h>
 
-#include "cs_ReturnTypes.h"
-#include "drivers/cs_Uart.h"
+#include <string.h>
 
 K_THREAD_STACK_DEFINE(uart_tid_stack_area, CS_UART_THREAD_STACK_SIZE);
+
+/**
+ * @brief Thread function that handles messages in the UART message queue.
+ *
+ * @param cls Pointer to the class instance.
+ * @param unused1 Unused parameter, is NULL.
+ * @param unused2 Unused parameter, is NULL.
+ */
+static void handleUartMessages(void *cls, void *unused1, void *unused2)
+{
+	Uart *uart_inst = static_cast<Uart *>(cls);
+
+	struct k_sem ws_sem;
+	if (uart_inst->_ws_inst != NULL) {
+		k_sem_init(&ws_sem, 1, 1);
+	}
+
+	uint8_t msg_buf[CS_UART_BUFFER_SIZE];
+	uint8_t pkt_buf[CS_UART_PACKET_BUF_SIZE];
+
+	while (1) {
+		// wait till sempahore is available when using websockets
+		if (uart_inst->_ws_inst != NULL) {
+			k_sem_take(&ws_sem, K_FOREVER);
+		}
+
+		// wait till message is retrieved from message queue
+		if (k_msgq_get(&uart_inst->_msgq_uart_msgs, &msg_buf, K_FOREVER) == 0) {
+			// packet sent from CM4 start with a specific token, handle the packet
+			if (msg_buf[0] == CS_UART_CM4_START_TOKEN) {
+				uart_inst->handleUartPacket(msg_buf);
+			} else {
+				int wrap_ret = uart_inst->wrapUartMessage(msg_buf, pkt_buf);
+				if (wrap_ret < 0) {
+					break;
+				}
+				// pass packet according to given method
+				if (uart_inst->_uart_inst != NULL) {
+					uart_inst->_uart_inst->sendUartMessage(pkt_buf, wrap_ret);
+				} else if (uart_inst->_ws_inst != NULL) {
+					uart_inst->_ws_inst->sendMessage(pkt_buf, wrap_ret,
+									 &ws_sem);
+				} else {
+					// for testing
+					// data is passed through, just log packet contents
+					LOG_HEXDUMP_DBG(pkt_buf, (uint32_t)wrap_ret, "uart_packet");
+				}
+			}
+		}
+	}
+}
+
+/**
+ * @brief Handle UART interrupts.
+ * Interrupt on RX is handled byte by byte, complete buffers sent to message queue.
+ */
+static void handleUartInterrupt(const struct device *dev, void *user_data)
+{
+	if (!uart_irq_update(dev) && !uart_irq_is_pending(dev)) {
+		return;
+	}
+
+	// class object pointer was passed at initialization
+	Uart *uart_inst = static_cast<Uart *>(user_data);
+
+	// handle interrupt on RX
+	if (uart_irq_rx_ready(dev)) {
+		uint8_t c;
+		// read one byte from the uart fifo queue
+		if (uart_fifo_read(dev, &c, 1) != 1) {
+			LOG_ERR("Failed to read from uart fifo");
+			return;
+		}
+
+		// store characters until line end is detected, or buffer if full
+		if (c == '\n' || c == '\r' ||
+		    uart_inst->_uart_rx_buf_ctr == (CS_UART_BUFFER_SIZE - 1)) {
+			if (uart_inst->_uart_rx_buf_ctr > 0) {
+				// terminate string
+				uart_inst->_uart_rx_buf[uart_inst->_uart_rx_buf_ctr] = '\0';
+
+				// add to message queue, this copies the data to ring buffer
+				// if queue is full, purge old data and try again
+				if (k_msgq_put(&uart_inst->_msgq_uart_msgs,
+					       &uart_inst->_uart_rx_buf, K_NO_WAIT) != 0) {
+					k_msgq_purge(&uart_inst->_msgq_uart_msgs);
+				}
+
+				uart_inst->_uart_rx_buf_ctr = 0;
+				memset(uart_inst->_uart_rx_buf, 0, sizeof(uart_inst->_uart_rx_buf));
+			}
+		} else if (uart_inst->_uart_rx_buf_ctr < (CS_UART_BUFFER_SIZE - 1)) {
+			uart_inst->_uart_rx_buf[uart_inst->_uart_rx_buf_ctr++] = c;
+		}
+	}
+
+	// handle interrupt on TX
+	if (uart_irq_tx_ready(dev)) {
+		if (uart_inst->_uart_tx_buf_ctr > 0) {
+			int n = uart_fifo_fill(dev, uart_inst->_uart_tx_buf_ptr,
+					       uart_inst->_uart_tx_buf_ctr);
+			uart_inst->_uart_tx_buf_ctr -= n;
+			uart_inst->_uart_tx_buf_ptr += n;
+		}
+
+		// check if all bytes were transmitted to avoid corrupted message
+		if (uart_irq_tx_complete(dev)) {
+			k_free(uart_inst->_uart_tx_buf);
+			uart_irq_tx_disable(dev);
+			uart_irq_rx_enable(dev);
+		}
+	}
+}
 
 /**
  * @brief Initialize the UART module.
@@ -28,7 +141,7 @@ K_THREAD_STACK_DEFINE(uart_tid_stack_area, CS_UART_THREAD_STACK_SIZE);
  */
 cs_err_t Uart::init(struct cs_uart_config *cfg)
 {
-	if (_is_initialized) {
+	if (_initialized) {
 		LOG_ERR("Already initialized");
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
@@ -82,8 +195,7 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 		return CS_ERR_UART_CONFIG_FAILED;
 	}
 
-	// initialize message queue
-	// aligned to 4-byte boundary
+	// initialize message queue, aligned to 4-byte boundary
 	char __aligned(4) msgq_buf[CS_UART_BUFFER_QUEUE_SIZE * CS_UART_BUFFER_SIZE];
 	k_msgq_init(&_msgq_uart_msgs, msgq_buf, CS_UART_BUFFER_SIZE, CS_UART_BUFFER_QUEUE_SIZE);
 
@@ -93,13 +205,12 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 	// start listening on RX
 	uart_irq_rx_enable(_uart_dev);
 
-	struct k_thread uart_tid;
 	// create thread for handling uart messages and packets
 	k_tid_t uart_thread = k_thread_create(
-		&uart_tid, uart_tid_stack_area, K_THREAD_STACK_SIZEOF(uart_tid_stack_area),
+		&_uart_tid, uart_tid_stack_area, K_THREAD_STACK_SIZEOF(uart_tid_stack_area),
 		handleUartMessages, this, NULL, NULL, CS_UART_THREAD_PRIORITY, 0, K_NO_WAIT);
 
-	_is_initialized = true;
+	_initialized = true;
 
 	return CS_OK;
 }
@@ -126,150 +237,10 @@ void Uart::sendUartMessage(uint8_t *msg, size_t len)
 }
 
 /**
- * @brief Disable all UART interrupts.
- */
-void Uart::disable()
-{
-	uart_irq_rx_disable(_uart_dev);
-	uart_irq_tx_disable(_uart_dev);
-}
-
-/**
- * @brief Handle UART data.
- * Interrupt on RX is handled byte by byte, complete buffers sent to message queue
- */
-void Uart::handleUartInterrupt(const struct device *dev, void *user_data)
-{
-	if (!uart_irq_update(dev) && !uart_irq_is_pending(dev)) {
-		return;
-	}
-
-	// class object pointer was passed at initialization
-	Uart *uart_inst = (Uart *)user_data;
-
-	// handle interrupt on RX
-	if (uart_irq_rx_ready(dev)) {
-		uint8_t c;
-		// read one byte from the uart fifo queue
-		if (uart_fifo_read(dev, &c, 1) != 1) {
-			LOG_ERR("Failed to read from uart fifo");
-			return;
-		}
-
-		// store characters until line end is detected, or buffer if full
-		if (((c == '\n' || c == '\r') && (uart_inst->_uart_rx_buf_ctr > 0)) ||
-		    (uart_inst->_uart_rx_buf_ctr == (CS_UART_BUFFER_SIZE - 1))) {
-			// terminate string
-			uart_inst->_uart_rx_buf[uart_inst->_uart_rx_buf_ctr] = '\0';
-
-			// if queue is full, something may have gone wrong
-			// save newer messages and discard the older onces
-			if (k_msgq_num_free_get(&uart_inst->_msgq_uart_msgs) == 0) {
-				k_msgq_purge(&uart_inst->_msgq_uart_msgs);
-			}
-			// add to message queue, this copies the data to ring buffer
-			k_msgq_put(&uart_inst->_msgq_uart_msgs, &uart_inst->_uart_rx_buf,
-				   K_NO_WAIT);
-
-			uart_inst->_uart_rx_buf_ctr = 0;
-			memset(uart_inst->_uart_rx_buf, 0, sizeof(uart_inst->_uart_rx_buf));
-		} else if (uart_inst->_uart_rx_buf_ctr < (CS_UART_BUFFER_SIZE - 1)) {
-			uart_inst->_uart_rx_buf[uart_inst->_uart_rx_buf_ctr++] = c;
-		}
-		// else: unhandled, pass
-	}
-
-	// handle interrupt on TX
-	if (uart_irq_tx_ready(dev)) {
-		if (uart_inst->_uart_tx_buf_ctr > 0) {
-			int n = uart_fifo_fill(dev, uart_inst->_uart_tx_buf_ptr,
-					       uart_inst->_uart_tx_buf_ctr);
-			uart_inst->_uart_tx_buf_ctr -= n;
-			uart_inst->_uart_tx_buf_ptr += n;
-		}
-
-		// check if all bytes were transmitted to avoid corrupted message
-		if (uart_irq_tx_complete(dev)) {
-			k_free(uart_inst->_uart_tx_buf);
-			uart_irq_tx_disable(dev);
-			uart_irq_rx_enable(dev);
-		}
-	}
-}
-
-/**
- * @brief Thread function that handles messages in the UART message queue.
- *
- * @param cls Pointer to the class instance.
- * @param unused1 Unused parameter, is NULL.
- * @param unused2 Unused parameter, is NULL.
- */
-void Uart::handleUartMessages(void *cls, void *unused1, void *unused2)
-{
-	Uart *uart_inst = (Uart *)cls;
-
-	if (!uart_inst->_is_initialized) {
-		LOG_ERR("Not initialized");
-		return;
-	}
-
-	struct k_sem ws_sem;
-	if (uart_inst->_ws_inst != NULL) {
-		k_sem_init(&ws_sem, 1, 1);
-	}
-
-	uint8_t pkt_buf[CS_UART_PACKET_BUF_SIZE];
-
-	while (1) {
-		// sleep if there are no messages in queue and skip the rest of the statements
-		if (k_msgq_num_used_get(&uart_inst->_msgq_uart_msgs) == 0) {
-			k_sleep(K_MSEC(CS_UART_THREAD_SLEEP));
-			continue;
-		}
-		// reiterate if sempahore not available, don't take anything out of the queue
-		if ((uart_inst->_ws_inst != NULL) && (k_sem_take(&ws_sem, K_NO_WAIT) != 0)) {
-			k_sleep(K_MSEC(CS_UART_THREAD_SLEEP));
-			continue;
-		}
-
-		uint8_t *msg = (uint8_t *)k_malloc(CS_UART_BUFFER_SIZE * sizeof(uint8_t));
-		if (msg == NULL) {
-			LOG_ERR("Failed to allocate memory for uart message buffer");
-			break;
-		}
-
-		// poll the message queue (no wait)
-		if (k_msgq_get(&uart_inst->_msgq_uart_msgs, &msg, K_NO_WAIT) != 0) {
-			// packet sent from CM4 start with a specific token, handle the packet
-			if (msg[0] == CS_UART_CM4_START_TOKEN) {
-				uart_inst->handleUartPacket(msg);
-			} else {
-				int wrap_ret = uart_inst->wrapUartMessage(msg, pkt_buf);
-				if (wrap_ret < 0) {
-					break;
-				}
-				// pass packet according to given method
-				if (uart_inst->_uart_inst != NULL) {
-					uart_inst->_uart_inst->sendUartMessage(pkt_buf, wrap_ret);
-				} else if (uart_inst->_ws_inst != NULL) {
-					uart_inst->_ws_inst->sendMessage(pkt_buf, wrap_ret,
-									 &ws_sem);
-				} else {
-					// for testing
-					// data is passed through, just log packet contents
-					LOG_HEXDUMP_DBG(pkt_buf, (uint32_t)wrap_ret, "uart_packet");
-				}
-			}
-		}
-
-		k_sleep(K_MSEC(CS_UART_THREAD_SLEEP));
-	}
-}
-
-/**
  * @brief Wrap raw UART data into a packet.
  *
  * @param message Pointer to UART message buffer.
+ * @param pkt_buf Pointer to buffer where packet contents should be stored.
  *
  * @return Size of the packet on success, <0 on fail.
  */
@@ -281,7 +252,6 @@ int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 	uint8_t *data_pkt = (uint8_t *)k_malloc(data_pkt_len * sizeof(uint8_t));
 	if (data_pkt == NULL) {
 		LOG_ERR("Failed to allocate memory for data packet");
-		k_free(message);
 		return CS_FAIL;
 	}
 
@@ -289,7 +259,6 @@ int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 	data_pkt[1] = _src_id;
 	sys_put_le16(payload_len, data_pkt + 2);
 	memcpy(data_pkt + 4, message, payload_len);
-	k_free(message);
 
 	int generic_pkt_len = (sizeof(cs_router_generic_packet) - sizeof(uint8_t *)) + data_pkt_len;
 	uint8_t *generic_pkt = (uint8_t *)k_malloc(generic_pkt_len * sizeof(uint8_t));
@@ -355,7 +324,6 @@ void Uart::handleUartPacket(uint8_t *packet)
 	uart_pkt_cm4.payload = (uint8_t *)k_malloc(cm4_payload_len * sizeof(uint8_t));
 	if (uart_pkt_cm4.payload == NULL) {
 		LOG_ERR("Failed to allocate memory for CM4 packet payload");
-		k_free(packet);
 		return;
 	}
 	memcpy(uart_pkt_cm4.payload, packet + uart_pkt_cm4_ctr, cm4_payload_len);
@@ -375,7 +343,16 @@ void Uart::handleUartPacket(uint8_t *packet)
 }
 
 /**
- * @brief Free all heap allocated memory.
+ * @brief Disable all UART interrupts.
+ */
+void Uart::disable()
+{
+	uart_irq_rx_disable(_uart_dev);
+	uart_irq_tx_disable(_uart_dev);
+}
+
+/**
+ * @brief Free all allocated memory.
  */
 Uart::~Uart()
 {

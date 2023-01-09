@@ -7,10 +7,14 @@
 
 #pragma once
 
-#include <stdbool.h>
-#include <stdint.h>
-
 #include "cs_ReturnTypes.h"
+
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/socket.h>
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 /**
  * @brief Socket hosts.
@@ -18,6 +22,14 @@
 enum cs_socket_host {
 	CS_SOCKET_HOST_DOMAIN,
 	CS_SOCKET_HOST_ADDR
+};
+
+/**
+ * @brief Socket IP versions.
+ */
+enum cs_socket_ip_version {
+	CS_SOCKET_IPV4,
+	CS_SOCKET_IPV6
 };
 
 /**
@@ -36,7 +48,7 @@ struct cs_socket_host_domain {
  * @brief Socket host mode addr, for connecting to given IP addresses (peers).
  *
  * @param peer_addr Peer address. Example 192.0.2.2 (ipv4) or 2001:db8::2 (ipv6)
- * @param port Peer port.
+ * @param port Peer port
  * @param host_name Hostname of the peer address, for example localhost. Used for TLS
  */
 struct cs_socket_host_addr {
@@ -48,32 +60,42 @@ struct cs_socket_host_addr {
 /**
  * @brief Socket options.
  *
- * @param socket_mode Socket mode. One of @ref cs_socket_modes
- * @param use_ipv6 Whether ipv6 should be used, instead of ipv4
- * @param http Instance of @ref cs_socket_mode_http, set with CS_SOCKET_MODE_HTTP
- * @param peer Instance of @ref cs_socket_mode_peer, set with CS_SOCKET_MODE_PEER
+ * @param host_mode Socket mode. One of @ref cs_socket_modes
+ * @param ip_version IP version. One of @ref cs_socket_ip_version
+ * @param domain Instance of @ref cs_socket_host_domain, set this when setting CS_SOCKET_HOST_DOMAIN
+ * as host mode
+ * @param addr Instance of @ref cs_socket_host_addr, set this when setting CS_SOCKET_HOST_ADDR as
+ * host mode
  */
 struct cs_socket_opts {
 	enum cs_socket_host host_mode;
-	bool use_ipv6;
+	enum cs_socket_ip_version ip_ver;
 	union {
-		struct cs_socket_host_domain domain;
-		struct cs_socket_host_addr addr;
+		struct cs_socket_host_domain *domain;
+		struct cs_socket_host_addr *addr;
 	};
 };
 
 class Socket
 {
 public:
+	Socket() = default;
+
 	cs_err_t initSocket(struct cs_socket_opts *opts);
 	cs_err_t closeSocket();
 
-protected:
+	/** ID of the socket */
 	int _sock_id = -1;
+
+protected:
+	/** Generic structure with address information, pointer to either addr4 or addr6 */
 	struct sockaddr *_addr = NULL;
+	/** Length of the address */
 	int _addr_len = 0;
+	/** Name of the host */
 	const char *_host_name = NULL;
 
 private:
-	bool _is_initialized = false;
+	/** Initialized flag */
+	bool _initialized = false;
 };

@@ -5,6 +5,9 @@
  * License: Apache License 2.0
  */
 
+#include "socket/cs_Socket.h"
+#include "socket/cs_CaCertificate.h"
+
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
 
@@ -12,8 +15,7 @@ LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
 
-#include "socket/cs_Socket.h"
-#include "socket/cs_CaCertificate.h"
+#include <stdio.h>
 
 /**
  * @brief Initialize socket.
@@ -24,7 +26,7 @@ LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
  */
 cs_err_t Socket::initSocket(struct cs_socket_opts *opts)
 {
-	if (_is_initialized) {
+	if (_initialized) {
 		LOG_ERR("Already initialized");
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
@@ -39,24 +41,24 @@ cs_err_t Socket::initSocket(struct cs_socket_opts *opts)
 	}
 
 	if (opts->host_mode == CS_SOCKET_HOST_DOMAIN) {
-		static struct zsock_addrinfo hints;
-		hints.ai_family = opts->use_ipv6 ? AF_INET6 : AF_INET;
+		struct zsock_addrinfo hints;
+		hints.ai_family = opts->ip_ver == CS_SOCKET_IPV6 ? AF_INET6 : AF_INET;
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = IPPROTO_TCP;
 
-		// 2 byte integer to string
-		char port_str[3]; // uint16 + terminator
-		snprintk(port_str, sizeof(port_str), "%hu", opts->domain.port);
+		// 2 byte integer (65k, max 5 characters) to string
+		char port_str[6]; // uint16 + terminator
+		sprintf(port_str, "%u", opts->domain->port);
 
 		// resolve host using DNS
 		struct zsock_addrinfo *res;
-		if (zsock_getaddrinfo(opts->domain.domain_name, port_str, &hints, &res) != 0) {
+		if (zsock_getaddrinfo(opts->domain->domain_name, port_str, &hints, &res) != 0) {
 			LOG_ERR("Unable to resolve host address");
 			return CS_ERR_SOCKET_UNABLE_TO_RESOLVE_HOST;
 		}
 		_addr = res->ai_addr;
 		_addr_len = res->ai_addrlen;
-		_host_name = opts->domain.domain_name;
+		_host_name = opts->domain->domain_name;
 
 		// create socket, using TLS when specified
 		if (IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
@@ -65,24 +67,24 @@ cs_err_t Socket::initSocket(struct cs_socket_opts *opts)
 			_sock_id = zsock_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		}
 	} else if (opts->host_mode == CS_SOCKET_HOST_ADDR) {
-		if (opts->use_ipv6) {
+		if (opts->ip_ver == CS_SOCKET_IPV6) {
 			struct sockaddr_in6 addr6;
 			addr6.sin6_family = AF_INET6;
-			addr6.sin6_port = htons(opts->addr.port);
+			addr6.sin6_port = htons(opts->addr->port);
 			// convert ascii addr to internal representation
-			zsock_inet_pton(AF_INET6, opts->addr.peer_addr, &addr6.sin6_addr);
+			zsock_inet_pton(AF_INET6, opts->addr->peer_addr, &addr6.sin6_addr);
 			_addr = (struct sockaddr *)&addr6;
 			_addr_len = sizeof(addr6);
 		} else {
 			struct sockaddr_in addr4;
 			addr4.sin_family = AF_INET;
-			addr4.sin_port = htons(opts->addr.port);
+			addr4.sin_port = htons(opts->addr->port);
 			// convert ascii addr to internal representation
-			zsock_inet_pton(AF_INET, opts->addr.peer_addr, &addr4.sin_addr);
+			zsock_inet_pton(AF_INET, opts->addr->peer_addr, &addr4.sin_addr);
 			_addr = (struct sockaddr *)&addr4;
 			_addr_len = sizeof(addr4);
 		}
-		_host_name = opts->addr.host_name;
+		_host_name = opts->addr->host_name;
 
 		// create socket, using TLS when specified
 		if (IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
@@ -118,7 +120,7 @@ cs_err_t Socket::initSocket(struct cs_socket_opts *opts)
 		}
 	}
 
-	_is_initialized = true;
+	_initialized = true;
 
 	return CS_OK;
 }
@@ -130,7 +132,7 @@ cs_err_t Socket::initSocket(struct cs_socket_opts *opts)
  */
 cs_err_t Socket::closeSocket()
 {
-	if (!_is_initialized) {
+	if (!_initialized) {
 		LOG_ERR("Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}

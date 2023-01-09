@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <stdint.h>
-
 #include "cs_ReturnTypes.h"
+
+#include <stdint.h>
 
 #define CS_PROTOCOL_VERSION 1
 #define CS_UART_PROTOCOL_VERSION 1
