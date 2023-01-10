@@ -65,7 +65,7 @@ cs_err_t HttpClient::sendHttpRequest(enum http_method method, const char *endpoi
 	k_mutex_lock(&_mtx, K_FOREVER);
 
 	// create new socket for the request
-	cs_err_t ret = initSocket(_opts);
+	cs_err_t ret = Socket::init(_opts);
 	if (ret != CS_OK) {
 		return ret;
 	}
@@ -99,7 +99,7 @@ cs_err_t HttpClient::sendHttpRequest(enum http_method method, const char *endpoi
 		return CS_ERR_SOCKET_HTTP_REQ_FAILED;
 	}
 
-	closeSocket();
+	Socket::close();
 
 	k_mutex_unlock(&_mtx);
 

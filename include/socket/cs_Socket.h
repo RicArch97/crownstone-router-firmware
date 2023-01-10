@@ -79,13 +79,18 @@ struct cs_socket_opts {
 class Socket
 {
 public:
-	Socket() = default;
-
-	cs_err_t initSocket(struct cs_socket_opts *opts);
-	cs_err_t closeSocket();
+	cs_err_t init(struct cs_socket_opts *opts);
+	cs_err_t close();
 
 	/** ID of the socket */
 	int _sock_id = -1;
+
+	/** Provides address hints to DNS resolver */
+	struct zsock_addrinfo _hints;
+	/** Address structure for IPv4 */
+	struct sockaddr_in _addr4;
+	/** Address structure for IPv6 */
+	struct sockaddr_in6 _addr6;
 
 protected:
 	/** Generic structure with address information, pointer to either addr4 or addr6 */

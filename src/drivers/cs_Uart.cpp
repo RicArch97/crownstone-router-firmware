@@ -30,6 +30,8 @@ static void handleUartMessages(void *cls, void *unused1, void *unused2)
 	Uart *uart_inst = static_cast<Uart *>(cls);
 
 	struct k_sem ws_sem;
+	struct k_mbox_msg send_msg;
+
 	if (uart_inst->_ws_inst != NULL) {
 		k_sem_init(&ws_sem, 1, 1);
 	}
@@ -38,8 +40,11 @@ static void handleUartMessages(void *cls, void *unused1, void *unused2)
 	uint8_t pkt_buf[CS_UART_PACKET_BUF_SIZE];
 
 	while (1) {
-		// wait till sempahore is available when using websockets
+		// when using websockets, wait till websocket is connected and semaphore is
+		// available
 		if (uart_inst->_ws_inst != NULL) {
+			k_event_wait(&uart_inst->_ws_inst->_evt_ws_connected,
+				     CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
 			k_sem_take(&ws_sem, K_FOREVER);
 		}
 
@@ -57,8 +62,11 @@ static void handleUartMessages(void *cls, void *unused1, void *unused2)
 				if (uart_inst->_uart_inst != NULL) {
 					uart_inst->_uart_inst->sendUartMessage(pkt_buf, wrap_ret);
 				} else if (uart_inst->_ws_inst != NULL) {
-					uart_inst->_ws_inst->sendMessage(pkt_buf, wrap_ret,
-									 &ws_sem);
+					send_msg.info = wrap_ret;
+					send_msg.size = wrap_ret;
+					send_msg.tx_data = pkt_buf;
+
+					uart_inst->_ws_inst->sendMessage(&send_msg, &ws_sem);
 				} else {
 					// for testing
 					// data is passed through, just log packet contents
@@ -257,7 +265,7 @@ int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 
 	data_pkt[0] = CS_SOURCE_TYPE_UART;
 	data_pkt[1] = _src_id;
-	sys_put_le16(payload_len, data_pkt + 2);
+	sys_put_be16(payload_len, data_pkt + 2);
 	memcpy(data_pkt + 4, message, payload_len);
 
 	int generic_pkt_len = (sizeof(cs_router_generic_packet) - sizeof(uint8_t *)) + data_pkt_len;
@@ -270,7 +278,7 @@ int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 
 	generic_pkt[0] = CS_PROTOCOL_VERSION;
 	generic_pkt[1] = CS_PACKET_TYPE_DATA;
-	sys_put_le16(data_pkt_len, generic_pkt + 2);
+	sys_put_be16(data_pkt_len, generic_pkt + 2);
 	memcpy(generic_pkt + 4, data_pkt, data_pkt_len);
 	k_free(data_pkt);
 
@@ -282,7 +290,7 @@ int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 		int uart_pkt_ctr = 0;
 
 		pkt_buf[uart_pkt_ctr++] = CS_UART_CM4_START_TOKEN;
-		sys_put_le16(uart_pkt_len - 3, pkt_buf + uart_pkt_ctr);
+		sys_put_be16(uart_pkt_len - 3, pkt_buf + uart_pkt_ctr);
 		uart_pkt_ctr += 2;
 		pkt_buf[uart_pkt_ctr++] = CS_UART_PROTOCOL_VERSION;
 		pkt_buf[uart_pkt_ctr++] = CS_PACKET_TYPE_GENERIC;
@@ -293,7 +301,7 @@ int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 		// calculate CRC16 CCITT over everything after length (so
 		// don't include start token and length)
 		uint16_t crc = crc16_ccitt(CS_UART_CM4_CRC_SEED, pkt_buf + 3, uart_pkt_ctr - 3);
-		sys_put_le16(crc, pkt_buf + uart_pkt_ctr);
+		sys_put_be16(crc, pkt_buf + uart_pkt_ctr);
 
 		return uart_pkt_len;
 	}
@@ -315,7 +323,7 @@ void Uart::handleUartPacket(uint8_t *packet)
 
 	struct cs_router_uart_packet uart_pkt_cm4;
 	uart_pkt_cm4.start_token = packet[uart_pkt_cm4_ctr++];
-	uart_pkt_cm4.length = sys_get_le16(packet + uart_pkt_cm4_ctr);
+	uart_pkt_cm4.length = sys_get_be16(packet + uart_pkt_cm4_ctr);
 	uart_pkt_cm4_ctr += 2;
 	uart_pkt_cm4.protocol_version = packet[uart_pkt_cm4_ctr++];
 	uart_pkt_cm4.type = packet[uart_pkt_cm4_ctr++];
@@ -331,7 +339,7 @@ void Uart::handleUartPacket(uint8_t *packet)
 
 	// check CRC CCITT over everything after length, not including CRC (uint16) itself
 	uint16_t check_crc = crc16_ccitt(CS_UART_CM4_CRC_SEED, packet + 3, uart_pkt_cm4.length - 2);
-	uint16_t received_crc = sys_get_le16(packet + uart_pkt_cm4_ctr);
+	uint16_t received_crc = sys_get_be16(packet + uart_pkt_cm4_ctr);
 	// skip packet if CRC doesn't match
 	if (check_crc != received_crc) {
 		LOG_WRN("CRC mismatch on received CM4 packet. Calculated: %hu, Received: %hu",

@@ -29,8 +29,6 @@
 class HttpClient : public Socket
 {
 public:
-	HttpClient() = default;
-	
 	void init(struct cs_socket_opts *opts);
 	cs_err_t sendHttpRequest(enum http_method method, const char *endpoint,
 				 const char *payload);

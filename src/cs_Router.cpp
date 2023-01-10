@@ -18,12 +18,12 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 
 #define RS485_DEVICE DT_NODELABEL(uart2)
 
-#define TEST_SSID "crownstonerouter"
-#define TEST_PSK  "test1234"
+#define TEST_SSID "ssid"
+#define TEST_PSK  "psk"
 
-#define HOST_ADDR "192.168.163.236"
-#define HOST_PORT 4000
-#define HOST_NAME "X570AM"
+#define HOST_ADDR "addr"
+#define HOST_PORT 8080
+#define HOST_NAME "CrownstoneRouter"
 
 int main(void)
 {
