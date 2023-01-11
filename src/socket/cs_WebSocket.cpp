@@ -9,7 +9,7 @@
 #include "cs_Router.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(cs_WebSocket, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(cs_WebSocket, LOG_LEVEL_INF);
 
 #include <zephyr/net/socket.h>
 #include <zephyr/net/websocket.h>

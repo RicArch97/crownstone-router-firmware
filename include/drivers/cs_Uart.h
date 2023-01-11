@@ -95,6 +95,9 @@ public:
 
 	/** UART message queue structure instance */
 	struct k_msgq _msgq_uart_msgs;
+	/** UART message buffer used by the message queue */
+	char __aligned(4) _msgq_buf[CS_UART_BUFFER_QUEUE_SIZE * CS_UART_BUFFER_SIZE];
+
 	/** UART thread structure instance */
 	struct k_thread _uart_tid;
 

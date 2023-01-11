@@ -204,8 +204,7 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 	}
 
 	// initialize message queue, aligned to 4-byte boundary
-	char __aligned(4) msgq_buf[CS_UART_BUFFER_QUEUE_SIZE * CS_UART_BUFFER_SIZE];
-	k_msgq_init(&_msgq_uart_msgs, msgq_buf, CS_UART_BUFFER_SIZE, CS_UART_BUFFER_QUEUE_SIZE);
+	k_msgq_init(&_msgq_uart_msgs, _msgq_buf, CS_UART_BUFFER_SIZE, CS_UART_BUFFER_QUEUE_SIZE);
 
 	// set ISR, pass pointer to this class object as user data
 	uart_irq_callback_user_data_set(_uart_dev, handleUartInterrupt, this);

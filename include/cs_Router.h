@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-#define CS_PROTOCOL_VERSION 1
+#define CS_PROTOCOL_VERSION	 1
 #define CS_UART_PROTOCOL_VERSION 1
 
 /**
@@ -37,7 +37,7 @@ struct cs_router_uart_packet {
 /**
  * @brief Crownstone router packet types.
  */
-enum cs_router_uart_packet_type {
+enum cs_router_uart_packet_type : uint8_t {
 	CS_PACKET_TYPE_GENERIC,
 	/** CS_PACKET_TYPE_GENERIC_ENCRYPTED */
 };
@@ -61,7 +61,7 @@ struct cs_router_generic_packet {
 /**
  * @brief Generic packet types.
  */
-enum cs_router_generic_packet_type {
+enum cs_router_generic_packet_type : uint8_t {
 	CS_PACKET_TYPE_CONTROL,
 	CS_PACKET_TYPE_RESULT,
 	CS_PACKET_TYPE_DATA
@@ -113,7 +113,7 @@ struct cs_router_data_packet {
 /**
  * @brief Control & result packet command types.
  */
-enum cs_router_command_type {
+enum cs_router_command_type : uint8_t {
 	CS_COMMAND_TYPE_SET_CONFIG,
 	CS_COMMAND_TYPE_GET_CONFIG,
 	CS_COMMAND_TYPE_WIFI_CONNECT,
@@ -125,7 +125,7 @@ enum cs_router_command_type {
 /**
  * @brief Result packet result types.
  */
-enum cs_router_result_code {
+enum cs_router_result_code : uint8_t {
 	CS_RESULT_TYPE_SUCCES,
 	CS_RESULT_TYPE_WAIT_FOR_SUCCESS,
 	CS_RESULT_TYPE_SUCCESS_NO_CHANGE,
@@ -142,13 +142,13 @@ enum cs_router_result_code {
 	CS_RESUKT_TYPE_NOT_IMPLEMENTED = (1 << 5),
 	CS_RESULT_TYPE_NOT_INITIALIZED,
 	CS_RESULT_TYPE_READ_FAILED,
-	CS_RESULT_TYPE_UNSPECIFIED = (1 << 8)
+	CS_RESULT_TYPE_UNSPECIFIED = (1 << 7)
 };
 
 /**
  * @brief Data packet data types.
  */
-enum cs_router_source_type {
+enum cs_router_source_type : uint8_t {
 	CS_SOURCE_TYPE_UART,
 	CS_SOURCE_TYPE_BLE,
 	CS_SOURCE_TYPE_CLOUD
@@ -157,23 +157,23 @@ enum cs_router_source_type {
 /**
  * @brief Data packet uart source id's.
  */
-enum cs_router_source_uart_id {
+enum cs_router_source_uart_id : uint8_t {
 	CS_SOURCE_ID_UART_RS485, // e.g. solar panel / heatpump / charging station
 	CS_SOURCE_ID_UART_RS232, // e.g. dutch smart meter
-	CS_SOURCE_ID_UART_CM4    // raspberry pi computer module 4 where application code runs
+	CS_SOURCE_ID_UART_CM4	 // raspberry pi computer module 4 where application code runs
 };
 
 /**
  * @brief Data packet cloud source id's.
  */
-enum cs_router_source_cloud_id {
+enum cs_router_source_cloud_id : uint8_t {
 	CS_SOURCE_ID_CLOUD_SERVER // cloud server where application code runs
 };
 
 /**
  * @brief Data packet ble source id's.
  */
-enum cs_router_source_ble_id {
+enum cs_router_source_ble_id : uint8_t {
 	CS_SOURCE_ID_BLE_CROWNSTONE_MESH,
 	CS_SOURCE_ID_BLE_CROWNSTONE_APP // possible for wifi detail exchange?
 };
@@ -211,7 +211,7 @@ struct cs_router_get_config_packet {
 /**
  * @brief Set config packet configuration types.
  */
-enum cs_router_config_type {
+enum cs_router_config_type : uint8_t {
 	CS_CONFIG_TYPE_WIFI_SSID,     // max 32 bytes
 	CS_CONFIG_TYPE_WIFI_PSK,      // max 64 bytes
 	CS_CONFIG_TYPE_UART_BAUDRATE, // uint32
@@ -220,7 +220,7 @@ enum cs_router_config_type {
 /**
  * @brief Set config & get config persistence modes.
  */
-enum cs_router_config_persistence_mode {
+enum cs_router_config_persistence_mode : uint8_t {
 	CS_CONFIG_PERSISTENCE_MODE_TEMPORARY,
 	CS_CONFIG_PERSISTENCE_MODE_STORED
 };

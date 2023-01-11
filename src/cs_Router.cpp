@@ -62,5 +62,7 @@ int main(void)
 
 	LOG_INF("Crownstone router initialized");
 
+	k_sleep(K_FOREVER);
+
 	return 0;
 }
