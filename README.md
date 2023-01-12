@@ -5,11 +5,11 @@ to improve integration between energy consumers and energy producers.
 
 ## Features
 
-* Wi-Fi
-* Ethernet
-* RS485
-* RS232
-* Integration with Crownstone BLE mesh
+* Wi-Fi / Ethernet
+* UART (can be used for RS485 and RS232)
+* Websocket connectivity / HTTP requests
+* Data transport according to own Crownstone router protocol
+* Async data sending / receiving using message queues and threads
 
 ## Getting started
 
