@@ -22,7 +22,7 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 #define TEST_PSK  "psk"
 
 #define HOST_ADDR "addr"
-#define HOST_PORT 8080
+#define HOST_PORT 14500
 #define HOST_NAME "CrownstoneRouter"
 
 int main(void)
@@ -55,7 +55,7 @@ int main(void)
 	}
 
 	const struct device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
-	Uart rs485(rs485_dev, CS_SOURCE_ID_UART_RS485, &ws);
+	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485, &ws);
 	if (rs485.init(NULL) == CS_OK) {
 		LOG_INF("RS485 initialized");
 	}

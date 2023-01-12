@@ -60,7 +60,7 @@ public:
 	 * @param dev Pointer to UART device structure.
 	 * @param src_id Identifier for the UART device, used in UART packets.
 	 */
-	Uart(const struct device *dev, enum cs_router_source_uart_id src_id)
+	Uart(const struct device *dev, enum cs_router_instance_uart_id src_id)
 		: _uart_dev(dev), _src_id(src_id){};
 	/**
 	 * @brief Uart constructor for initialization with websocket as target for packets.
@@ -69,7 +69,7 @@ public:
 	 * @param src_id Identifier for the UART device, used in data packets.
 	 * @param ws_inst Pointer to WebSocket instance that packets should be send to.
 	 */
-	Uart(const struct device *dev, enum cs_router_source_uart_id src_id, WebSocket *ws_inst)
+	Uart(const struct device *dev, enum cs_router_instance_uart_id src_id, WebSocket *ws_inst)
 		: _ws_inst(ws_inst), _uart_dev(dev), _src_id(src_id){};
 	/**
 	 * @brief Uart constructor for initialization with a UART connection as target for packets.
@@ -78,7 +78,7 @@ public:
 	 * @param src_id Identifier for the UART device, used in data packets.
 	 * @param uart_inst Pointer to Uart instance that packets should be send to.
 	 */
-	Uart(const struct device *dev, enum cs_router_source_uart_id src_id, Uart *uart_inst)
+	Uart(const struct device *dev, enum cs_router_instance_uart_id src_id, Uart *uart_inst)
 		: _uart_inst(uart_inst), _uart_dev(dev), _src_id(src_id){};
 	~Uart();
 
@@ -121,5 +121,5 @@ private:
 	const struct device *_uart_dev = NULL;
 
 	/** UART source id, identifying the UART device from which data is sent */
-	enum cs_router_source_uart_id _src_id;
+	enum cs_router_instance_uart_id _src_id;
 };

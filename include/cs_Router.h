@@ -71,11 +71,13 @@ enum cs_router_generic_packet_type : uint8_t {
  * @brief Frame struct for a control packet.
  *
  * @param command_type Type of the command
+ * @param dest_id The id of the destination device
  * @param length Length of the payload
  * @param payload Payload according to the command type, depends on length
  */
 struct cs_router_control_packet {
 	uint8_t command_type;
+	uint8_t dest_id;
 	uint16_t length;
 	uint8_t *payload;
 } __packed;
@@ -119,7 +121,8 @@ enum cs_router_command_type : uint8_t {
 	CS_COMMAND_TYPE_WIFI_CONNECT,
 	CS_COMMAND_TYPE_WIFI_DISCONNECT,
 	CS_COMMAND_TYPE_RESET,
-	CS_COMMAND_TYPE_FACTORY_RESET
+	CS_COMMAND_TYPE_FACTORY_RESET,
+	CS_COMMAND_TYPE_SWITCH
 };
 
 /**
@@ -148,34 +151,34 @@ enum cs_router_result_code : uint8_t {
 /**
  * @brief Data packet data types.
  */
-enum cs_router_source_type : uint8_t {
-	CS_SOURCE_TYPE_UART,
-	CS_SOURCE_TYPE_BLE,
-	CS_SOURCE_TYPE_CLOUD
+enum cs_router_instance_type : uint8_t {
+	CS_INSTANCE_TYPE_UART,
+	CS_INSTANCE_TYPE_BLE,
+	CS_INSTANCE_TYPE_CLOUD
 };
 
 /**
- * @brief Data packet uart source id's.
+ * @brief Data packet uart instance id's.
  */
-enum cs_router_source_uart_id : uint8_t {
-	CS_SOURCE_ID_UART_RS485, // e.g. solar panel / heatpump / charging station
-	CS_SOURCE_ID_UART_RS232, // e.g. dutch smart meter
-	CS_SOURCE_ID_UART_CM4	 // raspberry pi computer module 4 where application code runs
+enum cs_router_instance_uart_id : uint8_t {
+	CS_INSTANCE_ID_UART_RS485, // e.g. solar panel / heatpump / charging station
+	CS_INSTANCE_ID_UART_RS232, // e.g. dutch smart meter
+	CS_INSTANCE_ID_UART_CM4	 // raspberry pi computer module 4 where application code runs
 };
 
 /**
- * @brief Data packet cloud source id's.
+ * @brief Data packet cloud instance id's.
  */
-enum cs_router_source_cloud_id : uint8_t {
-	CS_SOURCE_ID_CLOUD_SERVER // cloud server where application code runs
+enum cs_router_instance_cloud_id : uint8_t {
+	CS_INSTANCE_ID_CLOUD_SERVER // cloud server where application code runs
 };
 
 /**
- * @brief Data packet ble source id's.
+ * @brief Data packet ble instance id's.
  */
-enum cs_router_source_ble_id : uint8_t {
-	CS_SOURCE_ID_BLE_CROWNSTONE_MESH,
-	CS_SOURCE_ID_BLE_CROWNSTONE_APP // possible for wifi detail exchange?
+enum cs_router_instance_ble_id : uint8_t {
+	CS_INSTANCE_ID_BLE_CROWNSTONE_MESH,
+	CS_INSTANCE_ID_BLE_CROWNSTONE_APP // possible for wifi detail exchange?
 };
 
 /**
@@ -224,3 +227,13 @@ enum cs_router_config_persistence_mode : uint8_t {
 	CS_CONFIG_PERSISTENCE_MODE_TEMPORARY,
 	CS_CONFIG_PERSISTENCE_MODE_STORED
 };
+
+/**
+ * @brief Frame struct for a switch command packet.
+ * 
+ * @param switch_value Value from 0 to 100, can be analog to support dimming.
+ * when using digital, 0 means off and 100 means on.
+*/
+struct cs_router_switch_command_packet {
+	uint8_t switch_value;
+} __packed;

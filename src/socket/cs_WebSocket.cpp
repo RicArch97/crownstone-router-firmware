@@ -48,10 +48,6 @@ static void handleMessageSend(void *cls, void *unused1, void *unused2)
 	WebSocket *ws_obj = static_cast<WebSocket *>(cls);
 
 	struct k_mbox_msg driver_msg;
-	driver_msg.info = CS_WEBSOCKET_MBOX_BUF_SIZE;
-	driver_msg.size = CS_WEBSOCKET_MBOX_BUF_SIZE;
-	driver_msg.rx_source_thread = K_ANY;
-
 	uint8_t driver_msg_buf[CS_WEBSOCKET_MBOX_BUF_SIZE];
 
 	while (1) {
@@ -59,13 +55,18 @@ static void handleMessageSend(void *cls, void *unused1, void *unused2)
 			break;
 		}
 
+		// prepare to receive message
+		driver_msg.info = CS_WEBSOCKET_MBOX_BUF_SIZE;
+		driver_msg.size = CS_WEBSOCKET_MBOX_BUF_SIZE;
+		driver_msg.rx_source_thread = K_ANY;
+
 		// get message from mailbox if available
 		if (k_mbox_get(&ws_obj->_ws_mbox, &driver_msg, driver_msg_buf, K_FOREVER) == 0) {
 			// size is updated after message is retrieved
 			if (driver_msg.info != driver_msg.size) {
 				LOG_WRN("Data dropped when retrieving data from mailbox, %d bytes "
-					"were sent, max is %d",
-					driver_msg.info, CS_WEBSOCKET_MBOX_BUF_SIZE);
+					"were sent, expected %d",
+					driver_msg.size, driver_msg.info);
 			}
 
 			// a message is available, make sure it is sent over the websocket
@@ -130,7 +131,7 @@ static void handleMessageReceive(void *cls, void *unused1, void *unused2)
 
 		// message was succesfully received
 		if (remaining_bytes == 0) {
-			LOG_DBG("Received %d bytes", total_read);
+			LOG_INF("Received %d bytes", total_read);
 
 			// TODO: handle message
 
@@ -251,6 +252,33 @@ cs_err_t WebSocket::sendMessage(struct k_mbox_msg *msg, struct k_sem *sem)
 	k_mbox_async_put(&_ws_mbox, msg, sem);
 
 	return CS_OK;
+}
+
+/**
+ * @brief Handle a packet received over the websocket.
+ *
+ * @param packet Pointer to the packet buffer.
+ */
+void WebSocket::handlePacket(uint8_t *packet)
+{
+	int pkt_ctr = 0;
+
+	struct cs_router_generic_packet generic_pkt;
+	generic_pkt.protocol_version = packet[pkt_ctr++];
+	generic_pkt.type = packet[pkt_ctr++];
+	generic_pkt.length = sys_get_be16(packet + pkt_ctr);
+	generic_pkt.payload = (uint8_t *)k_malloc(generic_pkt.length * sizeof(uint8_t));
+	if (generic_pkt.payload == NULL) {
+		LOG_ERR("Failed to allocate memory for generic packet payload");
+		return;
+	}
+	memcpy(generic_pkt.payload, packet + pkt_ctr, generic_pkt.length);
+
+	if (generic_pkt.protocol_version != CS_PROTOCOL_VERSION) {
+		LOG_ERR("Protocol mismatch: firmware protocol: %d, server protocol: %d. Not "
+			"handling packet.",
+			CS_PROTOCOL_VERSION, generic_pkt.protocol_version);
+	}
 }
 
 /**

@@ -33,6 +33,7 @@ public:
 	cs_err_t init(struct cs_socket_opts *opts);
 	cs_err_t connect(const char *url);
 	cs_err_t sendMessage(struct k_mbox_msg *msg, struct k_sem *sem);
+	void handlePacket(uint8_t *packet);
 	cs_err_t close();
 
 	/** ID of the websocket */

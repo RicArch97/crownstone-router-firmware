@@ -170,7 +170,7 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 		uart_cfg.parity = UART_CFG_PARITY_NONE;
 		uart_cfg.stop_bits = UART_CFG_STOP_BITS_1;
 	} else {
-		if (_src_id == CS_SOURCE_ID_UART_CM4) {
+		if (_src_id == CS_INSTANCE_ID_UART_CM4) {
 			// CM4 UART connection is not using any RS protocol, so not constrained
 			uart_cfg.baudrate = cfg->baudrate;
 			uart_cfg.parity = cfg->parity;
@@ -262,7 +262,7 @@ int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 		return CS_FAIL;
 	}
 
-	data_pkt[0] = CS_SOURCE_TYPE_UART;
+	data_pkt[0] = CS_INSTANCE_TYPE_UART;
 	data_pkt[1] = _src_id;
 	sys_put_be16(payload_len, data_pkt + 2);
 	memcpy(data_pkt + 4, message, payload_len);
