@@ -86,15 +86,15 @@ public:
 	int _sock_id = -1;
 
 	/** Provides address hints to DNS resolver */
-	struct zsock_addrinfo _hints;
+	zsock_addrinfo _hints;
 	/** Address structure for IPv4 */
-	struct sockaddr_in _addr4;
+	sockaddr_in _addr4;
 	/** Address structure for IPv6 */
-	struct sockaddr_in6 _addr6;
+	sockaddr_in6 _addr6;
 
 protected:
 	/** Generic structure with address information, pointer to either addr4 or addr6 */
-	struct sockaddr *_addr = NULL;
+	sockaddr *_addr = NULL;
 	/** Length of the address */
 	int _addr_len = 0;
 	/** Name of the host */

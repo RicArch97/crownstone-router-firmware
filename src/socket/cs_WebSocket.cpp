@@ -6,7 +6,7 @@
  */
 
 #include "socket/cs_WebSocket.h"
-#include "cs_Router.h"
+#include "cs_PacketHandling.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_WebSocket, LOG_LEVEL_INF);
@@ -24,7 +24,7 @@ K_THREAD_STACK_DEFINE(ws_send_tid_stack_area, CS_WEBSOCKET_THREAD_STACK_SIZE);
 /**
  * @brief Handle a websocket connection.
  */
-static int handleWebsocketConnect(int ws_sock, struct http_request *req, void *user_data)
+static int handleWebsocketConnect(int ws_sock, http_request *req, void *user_data)
 {
 	WebSocket *ws_obj = static_cast<WebSocket *>(user_data);
 
@@ -47,7 +47,7 @@ static void handleMessageSend(void *cls, void *unused1, void *unused2)
 {
 	WebSocket *ws_obj = static_cast<WebSocket *>(cls);
 
-	struct k_mbox_msg driver_msg;
+	k_mbox_msg driver_msg;
 	uint8_t driver_msg_buf[CS_WEBSOCKET_MBOX_BUF_SIZE];
 
 	while (1) {
@@ -149,7 +149,7 @@ static void handleMessageReceive(void *cls, void *unused1, void *unused2)
  *
  * @return CS_OK if the initialization was succesful.
  */
-cs_err_t WebSocket::init(struct cs_socket_opts *opts)
+cs_err_t WebSocket::init(cs_socket_opts *opts)
 {
 	int ret = Socket::init(opts);
 	if (ret != CS_OK) {
@@ -184,7 +184,7 @@ cs_err_t WebSocket::connect(const char *url)
 		return CS_ERR_SOCKET_CONNECT_FAILED;
 	}
 
-	struct websocket_request ws_req;
+	websocket_request ws_req;
 	memset(&ws_req, 0, sizeof(ws_req));
 
 	char addr[NET_IPV6_ADDR_LEN];
@@ -231,54 +231,32 @@ cs_err_t WebSocket::connect(const char *url)
 }
 
 /**
- * @brief Send message over websocket asynchronously by putting it in a mailbox.
+ * @brief Send message over websocket by putting it in a mailbox.
  *
- * @param msg Pointer to k_mbox_msg struct holding at least info, size and tx_data
- * @param sem Optional pointer to a semaphore that will be given when the message has been received.
- * NULL if not needed
+ * @param message Pointer to buffer with the message.
+ * @param len Length of the message.
  *
  * @return CS_OK if the message was succesfully put into the mailbox.
  */
-cs_err_t WebSocket::sendMessage(struct k_mbox_msg *msg, struct k_sem *sem)
+cs_err_t WebSocket::sendMessage(uint8_t *message, size_t len)
 {
 	if (!_initialized) {
 		LOG_ERR("Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}
 
-	msg->tx_block.data = NULL;
-	msg->tx_target_thread = _ws_send_thread;
+	k_mbox_msg send_msg;
 
-	k_mbox_async_put(&_ws_mbox, msg, sem);
+	send_msg.info = len;
+	send_msg.size = len;
+	send_msg.tx_data = message;
+	send_msg.tx_block.data = NULL;
+	send_msg.tx_target_thread = _ws_send_thread;
+
+	// waits till the message is received and processed
+	k_mbox_put(&_ws_mbox, &send_msg, K_FOREVER);
 
 	return CS_OK;
-}
-
-/**
- * @brief Handle a packet received over the websocket.
- *
- * @param packet Pointer to the packet buffer.
- */
-void WebSocket::handlePacket(uint8_t *packet)
-{
-	int pkt_ctr = 0;
-
-	struct cs_router_generic_packet generic_pkt;
-	generic_pkt.protocol_version = packet[pkt_ctr++];
-	generic_pkt.type = packet[pkt_ctr++];
-	generic_pkt.length = sys_get_be16(packet + pkt_ctr);
-	generic_pkt.payload = (uint8_t *)k_malloc(generic_pkt.length * sizeof(uint8_t));
-	if (generic_pkt.payload == NULL) {
-		LOG_ERR("Failed to allocate memory for generic packet payload");
-		return;
-	}
-	memcpy(generic_pkt.payload, packet + pkt_ctr, generic_pkt.length);
-
-	if (generic_pkt.protocol_version != CS_PROTOCOL_VERSION) {
-		LOG_ERR("Protocol mismatch: firmware protocol: %d, server protocol: %d. Not "
-			"handling packet.",
-			CS_PROTOCOL_VERSION, generic_pkt.protocol_version);
-	}
 }
 
 /**

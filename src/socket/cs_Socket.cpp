@@ -24,7 +24,7 @@ LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
  *
  * @return CS_OK if the initialization is successful.
  */
-cs_err_t Socket::init(struct cs_socket_opts *opts)
+cs_err_t Socket::init(cs_socket_opts *opts)
 {
 	if (_initialized) {
 		LOG_ERR("Already initialized");
@@ -50,7 +50,7 @@ cs_err_t Socket::init(struct cs_socket_opts *opts)
 		sprintf(port_str, "%u", opts->domain->port);
 
 		// resolve host using DNS
-		struct zsock_addrinfo *res;
+		zsock_addrinfo *res;
 		if (zsock_getaddrinfo(opts->domain->domain_name, port_str, &_hints, &res) != 0) {
 			LOG_ERR("Unable to resolve host address");
 			return CS_ERR_SOCKET_UNABLE_TO_RESOLVE_HOST;
@@ -71,14 +71,14 @@ cs_err_t Socket::init(struct cs_socket_opts *opts)
 			_addr6.sin6_port = htons(opts->addr->port);
 			// convert ascii addr to internal representation
 			zsock_inet_pton(AF_INET6, opts->addr->peer_addr, &_addr6.sin6_addr);
-			_addr = (struct sockaddr *)&_addr6;
+			_addr = (sockaddr *)&_addr6;
 			_addr_len = sizeof(_addr6);
 		} else {
 			_addr4.sin_family = AF_INET;
 			_addr4.sin_port = htons(opts->addr->port);
 			// convert ascii addr to internal representation
 			zsock_inet_pton(AF_INET, opts->addr->peer_addr, &_addr4.sin_addr);
-			_addr = (struct sockaddr *)&_addr4;
+			_addr = (sockaddr *)&_addr4;
 			_addr_len = sizeof(_addr4);
 		}
 		_host_name = opts->addr->host_name;

@@ -51,12 +51,12 @@ public:
 	uint8_t _psk_len = 0;
 
 	/** Structure with parameters for a wifi connect request */
-	struct wifi_connect_req_params _cnx_params = {0};
+	wifi_connect_req_params _cnx_params = {0};
 
 	/** Event structure used for an event when wifi network is found */
-	struct k_event _evt_ssid_found;
+	k_event _evt_ssid_found;
 	/** Event structure used for an event when connection is established */
-	struct k_event _evt_connected;
+	k_event _evt_connected;
 
 	/** Flag used to indicate that a disconnection has been requested */
 	bool _disconnecting = false;
@@ -68,5 +68,5 @@ private:
 	bool _initialized = false;
 
 	/** Network interface structure */
-	struct net_if *_iface = NULL;
+	net_if *_iface = NULL;
 };

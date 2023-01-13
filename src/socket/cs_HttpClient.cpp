@@ -19,8 +19,7 @@ LOG_MODULE_REGISTER(cs_HttpClient, LOG_LEVEL_INF);
 /**
  * @brief Handle a HTTP response.
  */
-static void handleHttpResponse(struct http_response *rsp, enum http_final_call final_data,
-			       void *user_data)
+static void handleHttpResponse(http_response *rsp, http_final_call final_data, void *user_data)
 {
 	if (final_data == HTTP_DATA_MORE) {
 		LOG_DBG("Partial data received (%zd bytes)", rsp->data_len);
@@ -37,7 +36,7 @@ static void handleHttpResponse(struct http_response *rsp, enum http_final_call f
  *
  * @param opts Instance of @ref cs_socket_opts.
  */
-void HttpClient::init(struct cs_socket_opts *opts)
+void HttpClient::init(cs_socket_opts *opts)
 {
 	_opts = opts;
 
@@ -53,8 +52,7 @@ void HttpClient::init(struct cs_socket_opts *opts)
  * @param endpoint Endpoint / url of the request
  * @param payload Payload that should be send to the server, otherwise NULL
  */
-cs_err_t HttpClient::sendHttpRequest(enum http_method method, const char *endpoint,
-				     const char *payload)
+cs_err_t HttpClient::sendHttpRequest(http_method method, const char *endpoint, const char *payload)
 {
 	if (!_initialized) {
 		LOG_ERR("Not initialized");
@@ -75,7 +73,7 @@ cs_err_t HttpClient::sendHttpRequest(enum http_method method, const char *endpoi
 		return CS_ERR_SOCKET_CONNECT_FAILED;
 	}
 
-	struct http_request http_req;
+	http_request http_req;
 	memset(&http_req, 0, sizeof(http_req));
 
 	char url_prefix[] = "/";

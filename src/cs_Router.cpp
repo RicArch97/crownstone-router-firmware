@@ -38,24 +38,29 @@ int main(void)
 	// wait till wifi connection is established before creating websocket
 	k_event_wait(&wifi->_evt_connected, CS_WIFI_CONNECTED_EVENT, true, K_FOREVER);
 	
-	struct cs_socket_host_addr ws_host_addr;
+	cs_socket_host_addr ws_host_addr;
 	ws_host_addr.peer_addr = HOST_ADDR;
 	ws_host_addr.port = HOST_PORT;
 	ws_host_addr.host_name = HOST_NAME;
 
-	struct cs_socket_opts ws_opts;
+	cs_socket_opts ws_opts;
 	ws_opts.host_mode = CS_SOCKET_HOST_ADDR;
 	ws_opts.ip_ver = CS_SOCKET_IPV4;
 	ws_opts.addr = &ws_host_addr;
 
 	WebSocket ws;
+	const device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
+	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485);
+
+	cs_router_instances inst;
+	inst.ws = &ws;
+	inst.rs485 = &rs485;
+
 	if (ws.init(&ws_opts) == CS_OK) {
 		LOG_INF("Websocket initialized");
 		ws.connect(NULL);
 	}
-
-	const struct device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
-	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485, &ws);
+	
 	if (rs485.init(NULL) == CS_OK) {
 		LOG_INF("RS485 initialized");
 	}

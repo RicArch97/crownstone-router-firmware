@@ -8,11 +8,69 @@
 #pragma once
 
 #include "cs_ReturnTypes.h"
+#include "drivers/cs_Uart.h"
+#include "socket/cs_WebSocket.h"
 
 #include <stdint.h>
 
 #define CS_PROTOCOL_VERSION	 1
 #define CS_UART_PROTOCOL_VERSION 1
+
+/**
+ * @brief Structure with instances used for routing.
+ * 
+ * @param rs485 Device connected over UART, using the RS485 protocol
+ * @param rs232 Device connected over UART, using the RS232 protocol
+ * @param cm4 Rarpberry Pi CM4 connected over UART, where processing is done
+ * @param ws Websocket connected to a server in the cloud
+*/
+struct cs_router_instances {
+	Uart *rs485;
+	Uart *rs232;
+	Uart *cm4;
+	WebSocket *ws;
+};
+
+/**
+ * @brief Packet instance types.
+ */
+enum cs_router_instance_type : uint8_t {
+	CS_INSTANCE_TYPE_ESP32,
+	CS_INSTANCE_TYPE_UART,
+	CS_INSTANCE_TYPE_BLE,
+	CS_INSTANCE_TYPE_CLOUD
+};
+
+/**
+ * @brief Packet ESP32 instance id.
+*/
+enum cs_router_instance_esp32_id : uint8_t {
+	CS_INSTANCE_ID_ESP32 // the controller where this firmware runs, for configuration commands
+};
+
+/**
+ * @brief Packet UART instance id's.
+ */
+enum cs_router_instance_uart_id : uint8_t {
+	CS_INSTANCE_ID_UART_RS485, // e.g. solar panel / heatpump / charging station
+	CS_INSTANCE_ID_UART_RS232, // e.g. dutch smart meter
+	CS_INSTANCE_ID_UART_CM4	 // raspberry pi computer module 4 where application code runs
+};
+
+/**
+ * @brief Packet cloud instance id.
+ */
+enum cs_router_instance_cloud_id : uint8_t {
+	CS_INSTANCE_ID_CLOUD // cloud server where application code runs
+};
+
+/**
+ * @brief Packet BLE instance id's.
+ */
+enum cs_router_instance_ble_id : uint8_t {
+	CS_INSTANCE_ID_BLE_CROWNSTONE_MESH, // crownstone's BLE mesh
+	CS_INSTANCE_ID_BLE_CROWNSTONE_CLIENT // 1 to 1 BLE connection to a crownstone
+};
 
 /**
  * @brief Frame struct for an UART Crownstone router communication packet.
@@ -71,12 +129,14 @@ enum cs_router_generic_packet_type : uint8_t {
  * @brief Frame struct for a control packet.
  *
  * @param command_type Type of the command
+ * @param dest_type The type of destination device
  * @param dest_id The id of the destination device
  * @param length Length of the payload
  * @param payload Payload according to the command type, depends on length
  */
 struct cs_router_control_packet {
 	uint8_t command_type;
+	uint8_t dest_type;
 	uint8_t dest_id;
 	uint16_t length;
 	uint8_t *payload;
@@ -146,39 +206,6 @@ enum cs_router_result_code : uint8_t {
 	CS_RESULT_TYPE_NOT_INITIALIZED,
 	CS_RESULT_TYPE_READ_FAILED,
 	CS_RESULT_TYPE_UNSPECIFIED = (1 << 7)
-};
-
-/**
- * @brief Data packet data types.
- */
-enum cs_router_instance_type : uint8_t {
-	CS_INSTANCE_TYPE_UART,
-	CS_INSTANCE_TYPE_BLE,
-	CS_INSTANCE_TYPE_CLOUD
-};
-
-/**
- * @brief Data packet uart instance id's.
- */
-enum cs_router_instance_uart_id : uint8_t {
-	CS_INSTANCE_ID_UART_RS485, // e.g. solar panel / heatpump / charging station
-	CS_INSTANCE_ID_UART_RS232, // e.g. dutch smart meter
-	CS_INSTANCE_ID_UART_CM4	 // raspberry pi computer module 4 where application code runs
-};
-
-/**
- * @brief Data packet cloud instance id's.
- */
-enum cs_router_instance_cloud_id : uint8_t {
-	CS_INSTANCE_ID_CLOUD_SERVER // cloud server where application code runs
-};
-
-/**
- * @brief Data packet ble instance id's.
- */
-enum cs_router_instance_ble_id : uint8_t {
-	CS_INSTANCE_ID_BLE_CROWNSTONE_MESH,
-	CS_INSTANCE_ID_BLE_CROWNSTONE_APP // possible for wifi detail exchange?
 };
 
 /**

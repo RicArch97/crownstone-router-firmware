@@ -30,23 +30,22 @@
 class WebSocket : public Socket
 {
 public:
-	cs_err_t init(struct cs_socket_opts *opts);
+	cs_err_t init(cs_socket_opts *opts);
 	cs_err_t connect(const char *url);
-	cs_err_t sendMessage(struct k_mbox_msg *msg, struct k_sem *sem);
-	void handlePacket(uint8_t *packet);
+	cs_err_t sendMessage(uint8_t *message, size_t len);
 	cs_err_t close();
 
 	/** ID of the websocket */
 	int _websock_id = -1;
 
 	/** Structure containing websocket receive thread information */
-	struct k_thread _ws_recv_tid;
+	k_thread _ws_recv_tid;
 	/** Structure containing websocket send thread information */
-	struct k_thread _ws_send_tid;
+	k_thread _ws_send_tid;
 	/** Mailbox structure for passing data to the websocket handler thread */
-	struct k_mbox _ws_mbox;
+	k_mbox _ws_mbox;
 	/** Event structure used for an event when websocket is connected */
-	struct k_event _evt_ws_connected;
+	k_event _evt_ws_connected;
 
 	/** Receive buffer of 512 bytes for storing data received from the websocket */
 	uint8_t _websocket_recv_buf[CS_WEBSOCKET_RECV_BUF_SIZE];

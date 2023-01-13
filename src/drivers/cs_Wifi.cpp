@@ -25,9 +25,9 @@ LOG_MODULE_REGISTER(cs_Wifi, LOG_LEVEL_INF);
 /**
  * @brief Handle wifi scan result.
  */
-static void handleWifiScanResult(struct net_mgmt_event_callback *cb)
+static void handleWifiScanResult(net_mgmt_event_callback *cb)
 {
-	const struct wifi_scan_result *entry = (const struct wifi_scan_result *)cb->info;
+	const wifi_scan_result *entry = (const wifi_scan_result *)cb->info;
 
 	// get singleton instance
 	Wifi *wifi_inst = &Wifi::getInstance();
@@ -46,9 +46,9 @@ static void handleWifiScanResult(struct net_mgmt_event_callback *cb)
 /**
  * @brief Handle wifi connect result.
  */
-static void handleWifiConnectionResult(struct net_mgmt_event_callback *cb)
+static void handleWifiConnectionResult(net_mgmt_event_callback *cb)
 {
-	const struct wifi_status *status = (const struct wifi_status *)cb->info;
+	const wifi_status *status = (const wifi_status *)cb->info;
 
 	// get singleton instance
 	Wifi *wifi_inst = &Wifi::getInstance();
@@ -61,12 +61,12 @@ static void handleWifiConnectionResult(struct net_mgmt_event_callback *cb)
 	}
 }
 
-/** 
+/**
  * @brief Handle wifi disconnect result.
-*/
-static void handleWifiDisconnectionResult(struct net_mgmt_event_callback *cb)
+ */
+static void handleWifiDisconnectionResult(net_mgmt_event_callback *cb)
 {
-	const struct wifi_status *status = (const struct wifi_status *)cb->info;
+	const wifi_status *status = (const wifi_status *)cb->info;
 
 	// get singleton instance
 	Wifi *wifi_inst = &Wifi::getInstance();
@@ -74,12 +74,10 @@ static void handleWifiDisconnectionResult(struct net_mgmt_event_callback *cb)
 	if (wifi_inst->_disconnecting) {
 		if (status->status) {
 			LOG_ERR("Disconnection request failed (%d)", status->status);
-		}
-		else {
+		} else {
 			LOG_INF("Disconnection request done (%d)", status->status);
 		}
-	}
-	else {
+	} else {
 		LOG_INF("Disconnected");
 	}
 }
@@ -87,8 +85,7 @@ static void handleWifiDisconnectionResult(struct net_mgmt_event_callback *cb)
 /**
  * @brief Handle wifi events.
  */
-static void handleWifiResult(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
-			     struct net_if *iface)
+static void handleWifiResult(net_mgmt_event_callback *cb, uint32_t mgmt_event, net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_SCAN_RESULT:
@@ -120,7 +117,7 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
 
-	const struct device *wifi_dev = DEVICE_DT_GET(WIFI_MODULE);
+	const device *wifi_dev = DEVICE_DT_GET(WIFI_MODULE);
 	// obtain a device reference and check if device is ready
 	if (!device_is_ready(wifi_dev)) {
 		LOG_ERR("WiFi device %s is not ready", wifi_dev->name);
@@ -135,7 +132,7 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
 	}
 
 	// initialize and add wifi event handler
-	static struct net_mgmt_event_callback wifi_mgmt_cb;
+	static net_mgmt_event_callback wifi_mgmt_cb;
 	net_mgmt_init_event_callback(&wifi_mgmt_cb, handleWifiResult, WIFI_MGMT_EVENTS);
 	net_mgmt_add_event_callback(&wifi_mgmt_cb);
 
@@ -192,7 +189,7 @@ cs_err_t Wifi::connect()
 		wifi_security_txt(_cnx_params.security), wifi_mfp_txt(_cnx_params.mfp));
 
 	if (net_mgmt(NET_REQUEST_WIFI_CONNECT, _iface, &_cnx_params,
-		     sizeof(struct wifi_connect_req_params)) != 0) {
+		     sizeof(wifi_connect_req_params)) != 0) {
 		LOG_ERR("Wifi connect request failed");
 	}
 

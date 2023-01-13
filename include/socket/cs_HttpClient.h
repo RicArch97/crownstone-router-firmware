@@ -29,8 +29,8 @@
 class HttpClient : public Socket
 {
 public:
-	void init(struct cs_socket_opts *opts);
-	cs_err_t sendHttpRequest(enum http_method method, const char *endpoint,
+	void init(cs_socket_opts *opts);
+	cs_err_t sendHttpRequest(http_method method, const char *endpoint,
 				 const char *payload);
 
 private:
@@ -38,11 +38,11 @@ private:
 	bool _initialized = false;
 
 	/** Structure with socket options used to create a socket */
-	struct cs_socket_opts *_opts = NULL;
+	cs_socket_opts *_opts = NULL;
 
 	/** Buffer to store HTTP responses */
 	uint8_t _http_recv_buf[CS_HTTP_CLIENT_RECV_BUF_SIZE];
 
 	/** Mutex structure to lock access to the socket & response buffer */
-	struct k_mutex _mtx;
+	k_mutex _mtx;
 };

@@ -6,13 +6,11 @@
  */
 
 #include "drivers/cs_Uart.h"
+#include "cs_PacketHandling.h"
 #include "cs_ReturnTypes.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_DBG);
-
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/crc.h>
 
 #include <string.h>
 
@@ -29,49 +27,28 @@ static void handleUartMessages(void *cls, void *unused1, void *unused2)
 {
 	Uart *uart_inst = static_cast<Uart *>(cls);
 
-	struct k_sem ws_sem;
-	struct k_mbox_msg send_msg;
-
-	if (uart_inst->_ws_inst != NULL) {
-		k_sem_init(&ws_sem, 1, 1);
-	}
-
 	uint8_t msg_buf[CS_UART_BUFFER_SIZE];
 	uint8_t pkt_buf[CS_UART_PACKET_BUF_SIZE];
 
 	while (1) {
-		// when using websockets, wait till websocket is connected and semaphore is
-		// available
-		if (uart_inst->_ws_inst != NULL) {
-			k_event_wait(&uart_inst->_ws_inst->_evt_ws_connected,
-				     CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
-			k_sem_take(&ws_sem, K_FOREVER);
+		// when using the cloud, wait for internet connection
+		if (uart_inst->_dest_type = CS_INSTANCE_TYPE_CLOUD) {
+			WebSocket *ws_inst = static_cast<WebSocket *>(uart_inst->_inst->ws);
+			k_event_wait(&ws_inst->_evt_ws_connected, CS_WEBSOCKET_CONNECTED_EVENT,
+				     false, K_FOREVER);
 		}
 
 		// wait till message is retrieved from message queue
 		if (k_msgq_get(&uart_inst->_msgq_uart_msgs, &msg_buf, K_FOREVER) == 0) {
 			// packet sent from CM4 start with a specific token, handle the packet
-			if (msg_buf[0] == CS_UART_CM4_START_TOKEN) {
-				uart_inst->handleUartPacket(msg_buf);
+			if (msg_buf[0] == CS_PACKET_UART_START_TOKEN) {
+				// TODO
 			} else {
 				int wrap_ret = uart_inst->wrapUartMessage(msg_buf, pkt_buf);
 				if (wrap_ret < 0) {
 					break;
 				}
-				// pass packet according to given method
-				if (uart_inst->_uart_inst != NULL) {
-					uart_inst->_uart_inst->sendUartMessage(pkt_buf, wrap_ret);
-				} else if (uart_inst->_ws_inst != NULL) {
-					send_msg.info = wrap_ret;
-					send_msg.size = wrap_ret;
-					send_msg.tx_data = pkt_buf;
-
-					uart_inst->_ws_inst->sendMessage(&send_msg, &ws_sem);
-				} else {
-					// for testing
-					// data is passed through, just log packet contents
-					LOG_HEXDUMP_DBG(pkt_buf, (uint32_t)wrap_ret, "uart_packet");
-				}
+				handleOutgoingPacket(pkt_buf, wrap_ret, uart_inst->_dest_type, uart_inst->_inst);
 			}
 		}
 	}
@@ -81,7 +58,7 @@ static void handleUartMessages(void *cls, void *unused1, void *unused2)
  * @brief Handle UART interrupts.
  * Interrupt on RX is handled byte by byte, complete buffers sent to message queue.
  */
-static void handleUartInterrupt(const struct device *dev, void *user_data)
+static void handleUartInterrupt(const device *dev, void *user_data)
 {
 	if (!uart_irq_update(dev) && !uart_irq_is_pending(dev)) {
 		return;
@@ -147,7 +124,7 @@ static void handleUartInterrupt(const struct device *dev, void *user_data)
  *
  * @return CS_OK if the UART module was sucessfully initialized.
  */
-cs_err_t Uart::init(struct cs_uart_config *cfg)
+cs_err_t Uart::init(cs_uart_config *cfg)
 {
 	if (_initialized) {
 		LOG_ERR("Already initialized");
@@ -161,7 +138,7 @@ cs_err_t Uart::init(struct cs_uart_config *cfg)
 	}
 
 	// configure uart parameters
-	struct uart_config uart_cfg = {0};
+	uart_config uart_cfg = {0};
 	uart_cfg.flow_ctrl = UART_CFG_FLOW_CTRL_NONE;
 	uart_cfg.data_bits = UART_CFG_DATA_BITS_8;
 
@@ -253,100 +230,26 @@ void Uart::sendUartMessage(uint8_t *msg, size_t len)
  */
 int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
 {
-	// buffer is string terminated, might be shorter than 256 on newline
-	int payload_len = strlen((char *)message);
-	int data_pkt_len = (sizeof(cs_router_data_packet) - sizeof(uint8_t *)) + payload_len;
-	uint8_t *data_pkt = (uint8_t *)k_malloc(data_pkt_len * sizeof(uint8_t));
-	if (data_pkt == NULL) {
-		LOG_ERR("Failed to allocate memory for data packet");
-		return CS_FAIL;
+	// uart buffers are null terminated
+	int data_pkt_len = wrapDataPacket(CS_INSTANCE_TYPE_UART, _src_id, message,
+					  strlen((char *)message), pkt_buf);
+
+	uint8_t data_pkt_tmp_buf[data_pkt_len];
+	memcpy(data_pkt_tmp_buf, pkt_buf, data_pkt_len);
+
+	int generic_pkt_len =
+		wrapGenericPacket(CS_PACKET_TYPE_DATA, data_pkt_tmp_buf, data_pkt_len, pkt_buf);
+
+	// when packet should be routed to CM4
+	if (_dest_type == CS_INSTANCE_TYPE_UART) {
+		uint8_t generic_pkt_tmp_buf[generic_pkt_len];
+		memcpy(generic_pkt_tmp_buf, pkt_buf, generic_pkt_len);
+
+		return wrapUartPacket(CS_PACKET_TYPE_GENERIC, generic_pkt_tmp_buf, generic_pkt_len,
+				      pkt_buf);
 	}
-
-	data_pkt[0] = CS_INSTANCE_TYPE_UART;
-	data_pkt[1] = _src_id;
-	sys_put_be16(payload_len, data_pkt + 2);
-	memcpy(data_pkt + 4, message, payload_len);
-
-	int generic_pkt_len = (sizeof(cs_router_generic_packet) - sizeof(uint8_t *)) + data_pkt_len;
-	uint8_t *generic_pkt = (uint8_t *)k_malloc(generic_pkt_len * sizeof(uint8_t));
-	if (generic_pkt == NULL) {
-		LOG_ERR("Failed to allocate memory for generic packet");
-		k_free(data_pkt);
-		return CS_FAIL;
-	}
-
-	generic_pkt[0] = CS_PROTOCOL_VERSION;
-	generic_pkt[1] = CS_PACKET_TYPE_DATA;
-	sys_put_be16(data_pkt_len, generic_pkt + 2);
-	memcpy(generic_pkt + 4, data_pkt, data_pkt_len);
-	k_free(data_pkt);
-
-	// if Uart instance is given, packets should be send over UART. Wrap into UART packet.
-	if (_uart_inst != NULL) {
-		int uart_pkt_len =
-			(sizeof(cs_router_uart_packet) - sizeof(uint8_t *)) + generic_pkt_len;
-
-		int uart_pkt_ctr = 0;
-
-		pkt_buf[uart_pkt_ctr++] = CS_UART_CM4_START_TOKEN;
-		sys_put_be16(uart_pkt_len - 3, pkt_buf + uart_pkt_ctr);
-		uart_pkt_ctr += 2;
-		pkt_buf[uart_pkt_ctr++] = CS_UART_PROTOCOL_VERSION;
-		pkt_buf[uart_pkt_ctr++] = CS_PACKET_TYPE_GENERIC;
-		memcpy(pkt_buf + uart_pkt_ctr, generic_pkt, generic_pkt_len);
-		uart_pkt_ctr += generic_pkt_len;
-		k_free(generic_pkt);
-
-		// calculate CRC16 CCITT over everything after length (so
-		// don't include start token and length)
-		uint16_t crc = crc16_ccitt(CS_UART_CM4_CRC_SEED, pkt_buf + 3, uart_pkt_ctr - 3);
-		sys_put_be16(crc, pkt_buf + uart_pkt_ctr);
-
-		return uart_pkt_len;
-	}
-
-	memcpy(pkt_buf, generic_pkt, generic_pkt_len);
-	k_free(generic_pkt);
 
 	return generic_pkt_len;
-}
-
-/**
- * @brief Handle UART packet received from CM4.
- *
- * @param packet Pointer to the packet buffer.
- */
-void Uart::handleUartPacket(uint8_t *packet)
-{
-	int uart_pkt_cm4_ctr = 0;
-
-	struct cs_router_uart_packet uart_pkt_cm4;
-	uart_pkt_cm4.start_token = packet[uart_pkt_cm4_ctr++];
-	uart_pkt_cm4.length = sys_get_be16(packet + uart_pkt_cm4_ctr);
-	uart_pkt_cm4_ctr += 2;
-	uart_pkt_cm4.protocol_version = packet[uart_pkt_cm4_ctr++];
-	uart_pkt_cm4.type = packet[uart_pkt_cm4_ctr++];
-
-	int cm4_payload_len = uart_pkt_cm4.length - 4; // minus protocol ver, type and CRC
-	uart_pkt_cm4.payload = (uint8_t *)k_malloc(cm4_payload_len * sizeof(uint8_t));
-	if (uart_pkt_cm4.payload == NULL) {
-		LOG_ERR("Failed to allocate memory for CM4 packet payload");
-		return;
-	}
-	memcpy(uart_pkt_cm4.payload, packet + uart_pkt_cm4_ctr, cm4_payload_len);
-	uart_pkt_cm4_ctr += cm4_payload_len;
-
-	// check CRC CCITT over everything after length, not including CRC (uint16) itself
-	uint16_t check_crc = crc16_ccitt(CS_UART_CM4_CRC_SEED, packet + 3, uart_pkt_cm4.length - 2);
-	uint16_t received_crc = sys_get_be16(packet + uart_pkt_cm4_ctr);
-	// skip packet if CRC doesn't match
-	if (check_crc != received_crc) {
-		LOG_WRN("CRC mismatch on received CM4 packet. Calculated: %hu, Received: %hu",
-			check_crc, received_crc);
-		return;
-	}
-
-	// TODO: do something with packet
 }
 
 /**
