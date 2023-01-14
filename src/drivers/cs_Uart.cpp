@@ -6,7 +6,6 @@
  */
 
 #include "drivers/cs_Uart.h"
-#include "cs_PacketHandling.h"
 #include "cs_ReturnTypes.h"
 
 #include <zephyr/logging/log.h>
@@ -28,27 +27,20 @@ static void handleUartMessages(void *cls, void *unused1, void *unused2)
 	Uart *uart_inst = static_cast<Uart *>(cls);
 
 	uint8_t msg_buf[CS_UART_BUFFER_SIZE];
-	uint8_t pkt_buf[CS_UART_PACKET_BUF_SIZE];
 
 	while (1) {
-		// when using the cloud, wait for internet connection
-		if (uart_inst->_dest_type = CS_INSTANCE_TYPE_CLOUD) {
-			WebSocket *ws_inst = static_cast<WebSocket *>(uart_inst->_inst->ws);
-			k_event_wait(&ws_inst->_evt_ws_connected, CS_WEBSOCKET_CONNECTED_EVENT,
-				     false, K_FOREVER);
-		}
-
 		// wait till message is retrieved from message queue
 		if (k_msgq_get(&uart_inst->_msgq_uart_msgs, &msg_buf, K_FOREVER) == 0) {
-			// packet sent from CM4 start with a specific token, handle the packet
+			LOG_HEXDUMP_DBG(msg_buf, (uint32_t)strlen((char *)msg_buf), "uart message");
+
+			// packets sent from CM4 start with a specific token, handle the packet
 			if (msg_buf[0] == CS_PACKET_UART_START_TOKEN) {
-				// TODO
+				uart_inst->_pkt_handler->handleIncomingPacket(msg_buf, true);
 			} else {
-				int wrap_ret = uart_inst->wrapUartMessage(msg_buf, pkt_buf);
-				if (wrap_ret < 0) {
-					break;
-				}
-				handleOutgoingPacket(pkt_buf, wrap_ret, uart_inst->_dest_type, uart_inst->_inst);
+				// UART buffers are null terminated, so get length with strlen
+				uart_inst->_pkt_handler->handlePeripheralData(
+					uart_inst->_src_id, uart_inst->_dest_id, msg_buf,
+					strlen((char *)msg_buf));
 			}
 		}
 	}
@@ -78,38 +70,38 @@ static void handleUartInterrupt(const device *dev, void *user_data)
 
 		// store characters until line end is detected, or buffer if full
 		if (c == '\n' || c == '\r' ||
-		    uart_inst->_uart_rx_buf_ctr == (CS_UART_BUFFER_SIZE - 1)) {
-			if (uart_inst->_uart_rx_buf_ctr > 0) {
+		    uart_inst->_uart_buf_ctr == (CS_UART_BUFFER_SIZE - 1)) {
+			if (uart_inst->_uart_buf_ctr > 0) {
 				// terminate string
-				uart_inst->_uart_rx_buf[uart_inst->_uart_rx_buf_ctr] = '\0';
+				uart_inst->_uart_buf[uart_inst->_uart_buf_ctr] = '\0';
 
 				// add to message queue, this copies the data to ring buffer
 				// if queue is full, purge old data and try again
-				if (k_msgq_put(&uart_inst->_msgq_uart_msgs,
-					       &uart_inst->_uart_rx_buf, K_NO_WAIT) != 0) {
+				if (k_msgq_put(&uart_inst->_msgq_uart_msgs, &uart_inst->_uart_buf,
+					       K_NO_WAIT) != 0) {
 					k_msgq_purge(&uart_inst->_msgq_uart_msgs);
 				}
 
-				uart_inst->_uart_rx_buf_ctr = 0;
-				memset(uart_inst->_uart_rx_buf, 0, sizeof(uart_inst->_uart_rx_buf));
+				uart_inst->_uart_buf_ctr = 0;
+				memset(uart_inst->_uart_buf, 0, sizeof(uart_inst->_uart_buf));
 			}
-		} else if (uart_inst->_uart_rx_buf_ctr < (CS_UART_BUFFER_SIZE - 1)) {
-			uart_inst->_uart_rx_buf[uart_inst->_uart_rx_buf_ctr++] = c;
+		} else if (uart_inst->_uart_buf_ctr < (CS_UART_BUFFER_SIZE - 1)) {
+			uart_inst->_uart_buf[uart_inst->_uart_buf_ctr++] = c;
 		}
 	}
 
 	// handle interrupt on TX
 	if (uart_irq_tx_ready(dev)) {
-		if (uart_inst->_uart_tx_buf_ctr > 0) {
-			int n = uart_fifo_fill(dev, uart_inst->_uart_tx_buf_ptr,
-					       uart_inst->_uart_tx_buf_ctr);
-			uart_inst->_uart_tx_buf_ctr -= n;
-			uart_inst->_uart_tx_buf_ptr += n;
+		if (uart_inst->_uart_buf_ctr > 0) {
+			int n = uart_fifo_fill(dev, uart_inst->_uart_buf_ptr,
+					       uart_inst->_uart_buf_ctr);
+			uart_inst->_uart_buf_ctr -= n;
+			uart_inst->_uart_buf_ptr += n;
 		}
 
 		// check if all bytes were transmitted to avoid corrupted message
 		if (uart_irq_tx_complete(dev)) {
-			k_free(uart_inst->_uart_tx_buf);
+			k_free(uart_inst->_uart_buf);
 			uart_irq_tx_disable(dev);
 			uart_irq_rx_enable(dev);
 		}
@@ -200,56 +192,22 @@ cs_err_t Uart::init(cs_uart_config *cfg)
 }
 
 /**
- * @brief Transmit a message over UART.
+ * @brief Transmit a message over UART. Callback function for PacketHandler.
  *
+ * @param cls Pointer to UART class instance.
  * @param msg Pointer to the buffer with the message data.
- * @param len Length of the message data.
+ * @param msg_len Length of the message data.
  */
-void Uart::sendUartMessage(uint8_t *msg, size_t len)
+void Uart::sendUartMessage(void *cls, uint8_t *msg, int msg_len)
 {
-	if (_uart_tx_buf != NULL) {
-		k_free(_uart_tx_buf);
-	}
-	_uart_tx_buf = (uint8_t *)k_malloc(len * sizeof(uint8_t));
+	Uart *uart_inst = static_cast<Uart *>(cls);
 
-	memcpy(_uart_tx_buf, msg, len);
-	_uart_tx_buf_ctr = len;
-	_uart_tx_buf_ptr = &_uart_tx_buf[0];
+	memcpy(uart_inst->_uart_buf, msg, msg_len);
+	uart_inst->_uart_buf_ctr = msg_len;
+	uart_inst->_uart_buf_ptr = &uart_inst->_uart_buf[0];
 
-	uart_irq_rx_disable(_uart_dev);
-	uart_irq_tx_enable(_uart_dev);
-}
-
-/**
- * @brief Wrap raw UART data into a packet.
- *
- * @param message Pointer to UART message buffer.
- * @param pkt_buf Pointer to buffer where packet contents should be stored.
- *
- * @return Size of the packet on success, <0 on fail.
- */
-int Uart::wrapUartMessage(uint8_t *message, uint8_t *pkt_buf)
-{
-	// uart buffers are null terminated
-	int data_pkt_len = wrapDataPacket(CS_INSTANCE_TYPE_UART, _src_id, message,
-					  strlen((char *)message), pkt_buf);
-
-	uint8_t data_pkt_tmp_buf[data_pkt_len];
-	memcpy(data_pkt_tmp_buf, pkt_buf, data_pkt_len);
-
-	int generic_pkt_len =
-		wrapGenericPacket(CS_PACKET_TYPE_DATA, data_pkt_tmp_buf, data_pkt_len, pkt_buf);
-
-	// when packet should be routed to CM4
-	if (_dest_type == CS_INSTANCE_TYPE_UART) {
-		uint8_t generic_pkt_tmp_buf[generic_pkt_len];
-		memcpy(generic_pkt_tmp_buf, pkt_buf, generic_pkt_len);
-
-		return wrapUartPacket(CS_PACKET_TYPE_GENERIC, generic_pkt_tmp_buf, generic_pkt_len,
-				      pkt_buf);
-	}
-
-	return generic_pkt_len;
+	uart_irq_rx_disable(uart_inst->_uart_dev);
+	uart_irq_tx_enable(uart_inst->_uart_dev);
 }
 
 /**
@@ -266,6 +224,5 @@ void Uart::disable()
  */
 Uart::~Uart()
 {
-	k_free(_uart_tx_buf);
 	k_msgq_cleanup(&_msgq_uart_msgs);
 }

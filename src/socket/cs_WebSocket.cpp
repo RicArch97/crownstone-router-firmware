@@ -26,9 +26,9 @@ K_THREAD_STACK_DEFINE(ws_send_tid_stack_area, CS_WEBSOCKET_THREAD_STACK_SIZE);
  */
 static int handleWebsocketConnect(int ws_sock, http_request *req, void *user_data)
 {
-	WebSocket *ws_obj = static_cast<WebSocket *>(user_data);
+	WebSocket *ws_inst = static_cast<WebSocket *>(user_data);
 
-	k_event_set(&ws_obj->_evt_ws_connected, CS_WEBSOCKET_CONNECTED_EVENT);
+	k_event_set(&ws_inst->_evt_ws_connected, CS_WEBSOCKET_CONNECTED_EVENT);
 
 	LOG_INF("Websocket %d connected", ws_sock);
 
@@ -45,23 +45,27 @@ static int handleWebsocketConnect(int ws_sock, http_request *req, void *user_dat
  */
 static void handleMessageSend(void *cls, void *unused1, void *unused2)
 {
-	WebSocket *ws_obj = static_cast<WebSocket *>(cls);
+	WebSocket *ws_inst = static_cast<WebSocket *>(cls);
 
 	k_mbox_msg driver_msg;
-	uint8_t driver_msg_buf[CS_WEBSOCKET_MBOX_BUF_SIZE];
+	uint8_t driver_msg_buf[CS_PACKET_BUF_SIZE];
 
 	while (1) {
-		if (ws_obj->_sock_id < 0 || ws_obj->_websock_id < 0) {
+		if (ws_inst->_sock_id < 0 || ws_inst->_websock_id < 0) {
 			break;
 		}
 
+		// wait for connection to websocket before trying to send messages from peripherals
+		k_event_wait(&ws_inst->_evt_ws_connected, CS_WEBSOCKET_CONNECTED_EVENT, false,
+			     K_FOREVER);
+
 		// prepare to receive message
-		driver_msg.info = CS_WEBSOCKET_MBOX_BUF_SIZE;
-		driver_msg.size = CS_WEBSOCKET_MBOX_BUF_SIZE;
+		driver_msg.info = CS_PACKET_BUF_SIZE;
+		driver_msg.size = CS_PACKET_BUF_SIZE;
 		driver_msg.rx_source_thread = K_ANY;
 
 		// get message from mailbox if available
-		if (k_mbox_get(&ws_obj->_ws_mbox, &driver_msg, driver_msg_buf, K_FOREVER) == 0) {
+		if (k_mbox_get(&ws_inst->_ws_mbox, &driver_msg, driver_msg_buf, K_FOREVER) == 0) {
 			// size is updated after message is retrieved
 			if (driver_msg.info != driver_msg.size) {
 				LOG_WRN("Data dropped when retrieving data from mailbox, %d bytes "
@@ -71,7 +75,7 @@ static void handleMessageSend(void *cls, void *unused1, void *unused2)
 
 			// a message is available, make sure it is sent over the websocket
 			int send_ret = websocket_send_msg(
-				ws_obj->_websock_id, driver_msg_buf, driver_msg.size,
+				ws_inst->_websock_id, driver_msg_buf, driver_msg.size,
 				WEBSOCKET_OPCODE_DATA_TEXT, true, true, SYS_FOREVER_MS);
 			if (send_ret < 0) {
 				LOG_ERR("Error: %s occured while trying to send message over "
@@ -94,22 +98,27 @@ static void handleMessageSend(void *cls, void *unused1, void *unused2)
  */
 static void handleMessageReceive(void *cls, void *unused1, void *unused2)
 {
-	WebSocket *ws_obj = static_cast<WebSocket *>(cls);
+	WebSocket *ws_inst = static_cast<WebSocket *>(cls);
 
 	uint32_t message_type;
 	uint64_t remaining_bytes = ULLONG_MAX;
 
 	while (1) {
-		if (ws_obj->_sock_id < 0 || ws_obj->_websock_id < 0) {
+		if (ws_inst->_sock_id < 0 || ws_inst->_websock_id < 0) {
 			break;
 		}
+
+		// wait for connection to websocket before trying to receive messages from
+		// peripherals
+		k_event_wait(&ws_inst->_evt_ws_connected, CS_WEBSOCKET_CONNECTED_EVENT, false,
+			     K_FOREVER);
 
 		int recv_ret, read_pos = 0, total_read = 0;
 		// receive data if available, don't block until it is
 		while (remaining_bytes > 0) {
 			recv_ret = websocket_recv_msg(
-				ws_obj->_websock_id, (ws_obj->_websocket_recv_buf + read_pos),
-				(sizeof(ws_obj->_websocket_recv_buf) - read_pos), &message_type,
+				ws_inst->_websock_id, (ws_inst->_websocket_recv_buf + read_pos),
+				(sizeof(ws_inst->_websocket_recv_buf) - read_pos), &message_type,
 				&remaining_bytes, 0);
 			// no data is available to be received
 			if (remaining_bytes < 0) {
@@ -131,10 +140,9 @@ static void handleMessageReceive(void *cls, void *unused1, void *unused2)
 
 		// message was succesfully received
 		if (remaining_bytes == 0) {
-			LOG_INF("Received %d bytes", total_read);
-
-			// TODO: handle message
-
+			LOG_DBG("Received %d bytes", total_read);
+			ws_inst->_pkt_handler->handleIncomingPacket(ws_inst->_websocket_recv_buf,
+								    false);
 			remaining_bytes = ULLONG_MAX;
 		}
 
@@ -232,31 +240,31 @@ cs_err_t WebSocket::connect(const char *url)
 
 /**
  * @brief Send message over websocket by putting it in a mailbox.
+ * Callback function for PacketHandler.
  *
+ * @param cls Pointer to UART class instance.
  * @param message Pointer to buffer with the message.
  * @param len Length of the message.
- *
- * @return CS_OK if the message was succesfully put into the mailbox.
  */
-cs_err_t WebSocket::sendMessage(uint8_t *message, size_t len)
+void WebSocket::sendMessage(void *cls, uint8_t *msg, int msg_len)
 {
-	if (!_initialized) {
+	WebSocket *ws_inst = static_cast<WebSocket *>(cls);
+
+	if (!ws_inst->_initialized) {
 		LOG_ERR("Not initialized");
-		return CS_ERR_NOT_INITIALIZED;
+		return;
 	}
 
 	k_mbox_msg send_msg;
 
-	send_msg.info = len;
-	send_msg.size = len;
-	send_msg.tx_data = message;
+	send_msg.info = msg_len;
+	send_msg.size = msg_len;
+	send_msg.tx_data = msg;
 	send_msg.tx_block.data = NULL;
-	send_msg.tx_target_thread = _ws_send_thread;
+	send_msg.tx_target_thread = ws_inst->_ws_send_thread;
 
 	// waits till the message is received and processed
-	k_mbox_put(&_ws_mbox, &send_msg, K_FOREVER);
-
-	return CS_OK;
+	k_mbox_put(&ws_inst->_ws_mbox, &send_msg, K_FOREVER);
 }
 
 /**

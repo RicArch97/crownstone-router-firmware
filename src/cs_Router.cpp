@@ -37,7 +37,7 @@ int main(void)
 
 	// wait till wifi connection is established before creating websocket
 	k_event_wait(&wifi->_evt_connected, CS_WIFI_CONNECTED_EVENT, true, K_FOREVER);
-	
+
 	cs_socket_host_addr ws_host_addr;
 	ws_host_addr.peer_addr = HOST_ADDR;
 	ws_host_addr.port = HOST_PORT;
@@ -48,19 +48,23 @@ int main(void)
 	ws_opts.ip_ver = CS_SOCKET_IPV4;
 	ws_opts.addr = &ws_host_addr;
 
-	WebSocket ws;
+	PacketHandler pkt_handler;
+	WebSocket web_socket;
+
 	const device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
-	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485);
+	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485, CS_INSTANCE_ID_CLOUD, &pkt_handler);
 
-	cs_router_instances inst;
-	inst.ws = &ws;
-	inst.rs485 = &rs485;
+	// register instances with transport callbacks
+	pkt_handler.registerTransportHandler(CS_INSTANCE_ID_UART_RS485, &rs485,
+					     Uart::sendUartMessage);
+	pkt_handler.registerTransportHandler(CS_INSTANCE_ID_CLOUD, &web_socket,
+					     WebSocket::sendMessage);
 
-	if (ws.init(&ws_opts) == CS_OK) {
+	if (web_socket.init(&ws_opts) == CS_OK) {
 		LOG_INF("Websocket initialized");
-		ws.connect(NULL);
+		web_socket.connect(NULL);
 	}
-	
+
 	if (rs485.init(NULL) == CS_OK) {
 		LOG_INF("RS485 initialized");
 	}

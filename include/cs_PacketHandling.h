@@ -8,21 +8,39 @@
 #pragma once
 
 #include "cs_Router.h"
+#include "cs_ReturnTypes.h"
+
+#include <zephyr/kernel.h>
 
 #include <stdint.h>
+#include <stdbool.h>
+
+#define CS_PACKET_BUF_SIZE 256
 
 #define CS_PACKET_UART_START_TOKEN 0x7E
 #define CS_PACKET_UART_CRC_SEED	   0xFFFF
 
-int wrapUartPacket(uint8_t type, uint8_t *payload, int payload_len, uint8_t *pkt_buf);
-int wrapGenericPacket(uint8_t type, uint8_t *payload, int payload_len, uint8_t *pkt_buf);
-int wrapDataPacket(uint8_t src_type, uint8_t src_id, uint8_t *payload, int payload_len,
-		   uint8_t *pkt_buf);
+struct cs_packet_handler {
+	cs_router_instance_id id;
+	void *cls;
+	void (*handler)(void *, uint8_t *, int);
+};
 
-void loadUartPacket(cs_router_uart_packet *uart_pkt, uint8_t *buffer);
-void loadGenericPacket(cs_router_generic_packet *generic_pkt, uint8_t *buffer);
-void loadControlPacket(cs_router_control_packet *ctrl_pkt, uint8_t *buffer);
-void loadSwitchCommandPacket(cs_router_switch_command_packet *switch_pkt, uint8_t *buffer);
+class PacketHandler
+{
+public:
+	PacketHandler() = default;
 
-void handleOutgoingPacket(uint8_t *packet, int packet_len, uint8_t dest_type, cs_router_instances *inst);
-void handleIncomingPacket(uint8_t *packet);
+	void registerTransportHandler(cs_router_instance_id inst_id, void *cls,
+				      void (*handle_func)(void *, uint8_t *, int));
+	void unregisterTransportHandler(cs_router_instance_id inst_id);
+	void handleIncomingPacket(uint8_t *buffer, bool is_uart_pkt);
+	void handlePeripheralData(cs_router_instance_id src_id, cs_router_instance_id dest_id,
+				  uint8_t *buffer, int buffer_len);
+
+private:
+	void transportPacket(cs_router_instance_id inst_id, uint8_t *buffer, int buffer_len);
+
+	cs_packet_handler _handlers[CS_INSTANCE_ID_AMOUNT];
+	int _handler_ctr = 0;
+};

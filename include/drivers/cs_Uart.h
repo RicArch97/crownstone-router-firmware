@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include "socket/cs_WebSocket.h"
 #include "cs_ReturnTypes.h"
 #include "cs_Router.h"
+#include "cs_PacketHandling.h"
 
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
@@ -30,8 +30,6 @@
 #define CS_UART_THREAD_STACK_SIZE 4096
 #define CS_UART_THREAD_SLEEP	  200
 
-#define CS_UART_PACKET_BUF_SIZE 512
-
 /**
  * @brief UART serial parameters, that both ends should agree on.
  *
@@ -50,24 +48,29 @@ class Uart
 public:
 	Uart() = default;
 	/**
-	 * @brief Uart constructor.
+	 * @brief Uart constructor for data packaging and transporting.
 	 *
-	 * @param dev Pointer to UART device structure.
-	 * @param src_id Identifier for the UART device, used in UART packets.
+	 * @param dev Pointer to UART device structure
+	 * @param src_id Identifier for the UART device, used in UART packets
+	 * @param dest_id Destination identifier for where the data should be transported to
+	 * @param handler PacketHandler instance
 	 */
-	Uart(const device *dev, cs_router_instance_uart_id src_id)
-		: _uart_dev(dev), _src_id(src_id){};
+	Uart(const device *dev, cs_router_instance_id src_id, cs_router_instance_id dest_id,
+	     PacketHandler *handler)
+		: _dest_id(dest_id), _src_id(src_id), _pkt_handler(handler), _uart_dev(dev){};
 	~Uart();
 
 	cs_err_t init(cs_uart_config *cfg);
-	void sendUartMessage(uint8_t *msg, size_t len);
-	int wrapUartMessage(uint8_t *message, uint8_t *pkt_buf);
 	void disable();
 
-	/** Destination type, where UART packets from this instance should be routed to */
-	cs_router_instance_type _dest_type;
-	/** Instances where UART packets can be routed to */
-	cs_router_instances *_inst = NULL;
+	static void sendUartMessage(void *cls, uint8_t *msg, int msg_len);
+
+	/** Destination id, where UART packets from this instance should be routed to */
+	cs_router_instance_id _dest_id;
+	/** UART source id, identifying the UART device from which data is sent */
+	cs_router_instance_id _src_id;
+	/** PacketHanler instance to handle messages and packets */
+	PacketHandler *_pkt_handler = NULL;
 
 	/** UART message queue structure instance */
 	k_msgq _msgq_uart_msgs;
@@ -75,19 +78,14 @@ public:
 	char __aligned(4) _msgq_buf[CS_UART_BUFFER_QUEUE_SIZE * CS_UART_BUFFER_SIZE];
 
 	/** UART thread structure instance */
- 	k_thread _uart_tid;
+	k_thread _uart_tid;
 
-	/** UART RX buffer of 256 bytes containing raw data received over UART */
-	uint8_t _uart_rx_buf[CS_UART_BUFFER_SIZE];
-	/** Counter for the amount of bytes currently in the RX buffer */
-	uint16_t _uart_rx_buf_ctr = 0;
-
-	/** Heap allocated UART TX buffer, size depends on the message */
-	uint8_t *_uart_tx_buf = NULL;
-	/** Pointer that points to the last handled byte in the TX buffer */
-	uint8_t *_uart_tx_buf_ptr = NULL;
-	/** Counter for the amount of bytes currently in the TX buffer */
-	uint16_t _uart_tx_buf_ctr = 0;
+	/** UART buffer of 256 bytes */
+	uint8_t _uart_buf[CS_UART_BUFFER_SIZE];
+	/** Counter for the amount of bytes currently in the UART buffer */
+	uint16_t _uart_buf_ctr = 0;
+	/** Pointer that points to the last handled byte in the UART buffer */
+	uint8_t *_uart_buf_ptr = NULL;
 
 private:
 	/** Initialized flag */
@@ -95,7 +93,4 @@ private:
 
 	/** UART device structure, holding information about the current UART hardware */
 	const device *_uart_dev = NULL;
-
-	/** UART source id, identifying the UART device from which data is sent */
-	cs_router_instance_uart_id _src_id;
 };
