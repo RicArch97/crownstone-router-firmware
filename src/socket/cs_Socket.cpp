@@ -11,8 +11,6 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
 
-#include <zephyr/net/net_ip.h>
-#include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
 
 #include <stdio.h>

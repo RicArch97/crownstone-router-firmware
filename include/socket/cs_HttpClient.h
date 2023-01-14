@@ -28,12 +28,11 @@
 
 class HttpClient : public Socket
 {
-public:
+      public:
 	void init(cs_socket_opts *opts);
-	cs_err_t sendHttpRequest(http_method method, const char *endpoint,
-				 const char *payload);
+	cs_err_t sendHttpRequest(http_method method, const char *endpoint, const char *payload);
 
-private:
+      private:
 	/** Initialized flag */
 	bool _initialized = false;
 

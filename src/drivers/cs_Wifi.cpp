@@ -6,12 +6,10 @@
  */
 
 #include "drivers/cs_Wifi.h"
-#include "cs_ReturnTypes.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Wifi, LOG_LEVEL_INF);
 
-#include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/sys/util.h>
 

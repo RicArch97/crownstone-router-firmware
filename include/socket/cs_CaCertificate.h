@@ -7,6 +7,6 @@
 
 #pragma once
 
-#define CA_CERTIFICATE_TAG  1
+#define CA_CERTIFICATE_TAG 1
 
-static const unsigned char ca_certificate[] = "crownstone-cloud-cert.der";  // TODO
+static const unsigned char ca_certificate[] = "crownstone-cloud-cert.der"; // TODO

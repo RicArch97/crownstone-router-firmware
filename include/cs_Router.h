@@ -150,16 +150,16 @@ enum cs_router_result_code : uint8_t {
 
 /**
  * @brief Instance ids.
-*/
+ */
 enum cs_router_instance_id : uint8_t {
 	CS_INSTANCE_ID_ESP32, // the controller where this firmware runs, for configuration commands
 	CS_INSTANCE_ID_UART_RS485, // e.g. solar panel / heatpump / charging station
 	CS_INSTANCE_ID_UART_RS232, // e.g. dutch smart meter
-	CS_INSTANCE_ID_UART_CM4,	 // raspberry pi computer module 4 where application code runs
-	CS_INSTANCE_ID_CLOUD, // cloud server where application code runs
-	CS_INSTANCE_ID_BLE_CROWNSTONE_MESH, // crownstone's BLE mesh
+	CS_INSTANCE_ID_UART_CM4,   // raspberry pi computer module 4 where application code runs
+	CS_INSTANCE_ID_CLOUD,	   // cloud server where application code runs
+	CS_INSTANCE_ID_BLE_CROWNSTONE_MESH,   // crownstone's BLE mesh
 	CS_INSTANCE_ID_BLE_CROWNSTONE_CLIENT, // 1 to 1 BLE connection to a crownstone
-	CS_INSTANCE_ID_AMOUNT // amount of instance id's available
+	CS_INSTANCE_ID_AMOUNT		      // amount of instance id's available
 };
 
 /**
@@ -211,10 +211,10 @@ enum cs_router_config_persistence_mode : uint8_t {
 
 /**
  * @brief Frame struct for a switch command packet.
- * 
+ *
  * @param switch_value Value from 0 to 100, can be analog to support dimming.
  * when using digital, 0 means off and 100 means on.
-*/
+ */
 struct cs_router_switch_command_packet {
 	uint8_t switch_value;
 } __packed;

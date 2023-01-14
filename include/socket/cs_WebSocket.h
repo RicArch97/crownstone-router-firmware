@@ -27,7 +27,7 @@
 
 class WebSocket : public Socket
 {
-public:
+      public:
 	WebSocket() = default;
 	/**
 	 * @brief WebSocket constructor for data packaging and handling.
@@ -62,7 +62,7 @@ public:
 	/** Temp receive buffer with extra space for HTTP headers, for the HTTP handshake */
 	uint8_t _websocket_recv_temp_buf[CS_PACKET_BUF_SIZE + CS_WEBSOCKET_HTTP_HEADER_SIZE];
 
-private:
+      private:
 	/** Initialized flag */
 	bool _initialized = false;
 

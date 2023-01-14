@@ -78,7 +78,7 @@ struct cs_socket_opts {
 
 class Socket
 {
-public:
+      public:
 	cs_err_t init(struct cs_socket_opts *opts);
 	cs_err_t close();
 
@@ -92,7 +92,7 @@ public:
 	/** Address structure for IPv6 */
 	sockaddr_in6 _addr6;
 
-protected:
+      protected:
 	/** Generic structure with address information, pointer to either addr4 or addr6 */
 	sockaddr *_addr = NULL;
 	/** Length of the address */
@@ -100,7 +100,7 @@ protected:
 	/** Name of the host */
 	const char *_host_name = NULL;
 
-private:
+      private:
 	/** Initialized flag */
 	bool _initialized = false;
 };

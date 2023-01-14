@@ -9,6 +9,7 @@
 
 #include "cs_ReturnTypes.h"
 
+#include <zephyr/kernel.h>
 #include <zephyr/net/net_core.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/net_if.h>
@@ -25,7 +26,7 @@
 
 class Wifi
 {
-public:
+      public:
 	static Wifi &getInstance()
 	{
 		static Wifi instance;
@@ -61,7 +62,7 @@ public:
 	/** Flag used to indicate that a disconnection has been requested */
 	bool _disconnecting = false;
 
-private:
+      private:
 	Wifi() = default;
 
 	/** Initialized flag */

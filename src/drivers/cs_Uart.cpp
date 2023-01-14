@@ -6,7 +6,6 @@
  */
 
 #include "drivers/cs_Uart.h"
-#include "cs_ReturnTypes.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_DBG);

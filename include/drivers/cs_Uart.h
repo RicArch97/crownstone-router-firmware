@@ -45,7 +45,7 @@ struct cs_uart_config {
 
 class Uart
 {
-public:
+      public:
 	Uart() = default;
 	/**
 	 * @brief Uart constructor for data packaging and transporting.
@@ -87,7 +87,7 @@ public:
 	/** Pointer that points to the last handled byte in the UART buffer */
 	uint8_t *_uart_buf_ptr = NULL;
 
-private:
+      private:
 	/** Initialized flag */
 	bool _initialized = false;
 

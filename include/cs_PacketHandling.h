@@ -10,8 +10,6 @@
 #include "cs_Router.h"
 #include "cs_ReturnTypes.h"
 
-#include <zephyr/kernel.h>
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -28,7 +26,7 @@ struct cs_packet_handler {
 
 class PacketHandler
 {
-public:
+      public:
 	PacketHandler() = default;
 
 	void registerTransportHandler(cs_router_instance_id inst_id, void *cls,
@@ -38,7 +36,7 @@ public:
 	void handlePeripheralData(cs_router_instance_id src_id, cs_router_instance_id dest_id,
 				  uint8_t *buffer, int buffer_len);
 
-private:
+      private:
 	void transportPacket(cs_router_instance_id inst_id, uint8_t *buffer, int buffer_len);
 
 	cs_packet_handler _handlers[CS_INSTANCE_ID_AMOUNT];

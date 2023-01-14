@@ -6,7 +6,6 @@
  */
 
 #include "socket/cs_WebSocket.h"
-#include "cs_PacketHandling.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_WebSocket, LOG_LEVEL_INF);
