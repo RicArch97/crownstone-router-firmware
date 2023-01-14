@@ -29,9 +29,9 @@ int main(void)
 {
 	Wifi *wifi = &Wifi::getInstance();
 	if (wifi->init(TEST_SSID, TEST_PSK) == CS_OK) {
-		LOG_INF("Wifi initialized");
+		LOG_INF("%s", "Wifi initialized");
 		if (wifi->connect() == CS_OK) {
-			LOG_INF("Wifi connection request done");
+			LOG_INF("%s", "Wifi connection request done");
 		}
 	}
 
@@ -61,15 +61,15 @@ int main(void)
 					     WebSocket::sendMessage);
 
 	if (web_socket.init(&ws_opts) == CS_OK) {
-		LOG_INF("Websocket initialized");
+		LOG_INF("%s", "Websocket initialized");
 		web_socket.connect(NULL);
 	}
 
 	if (rs485.init(NULL) == CS_OK) {
-		LOG_INF("RS485 initialized");
+		LOG_INF("%s", "RS485 initialized");
 	}
 
-	LOG_INF("Crownstone router initialized");
+	LOG_INF("%s", "Crownstone router initialized");
 
 	k_sleep(K_FOREVER);
 

@@ -25,7 +25,7 @@ LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
 cs_err_t Socket::init(cs_socket_opts *opts)
 {
 	if (_initialized) {
-		LOG_ERR("Already initialized");
+		LOG_ERR("%s", "Already initialized");
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
 
@@ -33,7 +33,7 @@ cs_err_t Socket::init(cs_socket_opts *opts)
 	if (IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
 		if (tls_credential_add(CA_CERTIFICATE_TAG, TLS_CREDENTIAL_CA_CERTIFICATE,
 				       ca_certificate, sizeof(ca_certificate)) < 0) {
-			LOG_ERR("Failed to register CA certificate");
+			LOG_ERR("%s", "Failed to register CA certificate");
 			return CS_ERR_SOCKET_CA_CERT_REGISTER_FAILED;
 		}
 	}
@@ -50,7 +50,7 @@ cs_err_t Socket::init(cs_socket_opts *opts)
 		// resolve host using DNS
 		zsock_addrinfo *res;
 		if (zsock_getaddrinfo(opts->domain->domain_name, port_str, &_hints, &res) != 0) {
-			LOG_ERR("Unable to resolve host address");
+			LOG_ERR("%s", "Unable to resolve host address");
 			return CS_ERR_SOCKET_UNABLE_TO_RESOLVE_HOST;
 		}
 		_addr = res->ai_addr;
@@ -88,19 +88,19 @@ cs_err_t Socket::init(cs_socket_opts *opts)
 			_sock_id = zsock_socket(_addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
 		}
 	} else {
-		LOG_ERR("Invalid mode provided");
+		LOG_ERR("%s", "Invalid mode provided");
 		return CS_ERR_SOCKET_INVALID_MODE;
 	}
 
 	if (_sock_id < 0) {
-		LOG_ERR("Failed to create socket");
+		LOG_ERR("%s", "Failed to create socket");
 		return CS_ERR_SOCKET_CREATION_FAILED;
 	}
 
 	if (IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
 		if (zsock_setsockopt(_sock_id, SOL_TLS, TLS_HOSTNAME, _host_name,
 				     strlen(_host_name)) < 0) {
-			LOG_ERR("Failed to set TLS hostname");
+			LOG_ERR("%s", "Failed to set TLS hostname");
 			return CS_ERR_SOCKET_SET_TLS_HOSTNAME_FAILED;
 		}
 
@@ -110,7 +110,7 @@ cs_err_t Socket::init(cs_socket_opts *opts)
 		// set TLS tags, in this case only certificate
 		if (zsock_setsockopt(_sock_id, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_opt,
 				     sizeof(sec_tag_opt)) < 0) {
-			LOG_ERR("Failed to set TLS_SEC_TAG_LIST option");
+			LOG_ERR("%s", "Failed to set TLS_SEC_TAG_LIST option");
 			return CS_ERR_SOCKET_SET_TLS_TAG_LIST_FAILED;
 		}
 	}
@@ -128,7 +128,7 @@ cs_err_t Socket::init(cs_socket_opts *opts)
 cs_err_t Socket::close()
 {
 	if (!_initialized) {
-		LOG_ERR("Not initialized");
+		LOG_ERR("%s", "Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}
 

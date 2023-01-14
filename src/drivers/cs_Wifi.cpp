@@ -55,7 +55,7 @@ static void handleWifiConnectionResult(net_mgmt_event_callback *cb)
 		LOG_ERR("Connection request failed (%d)", status->status);
 	} else {
 		k_event_set(&wifi_inst->_evt_connected, CS_WIFI_CONNECTED_EVENT);
-		LOG_INF("Connected");
+		LOG_INF("%s", "Connected");
 	}
 }
 
@@ -76,7 +76,7 @@ static void handleWifiDisconnectionResult(net_mgmt_event_callback *cb)
 			LOG_INF("Disconnection request done (%d)", status->status);
 		}
 	} else {
-		LOG_INF("Disconnected");
+		LOG_INF("%s", "Disconnected");
 	}
 }
 
@@ -111,7 +111,7 @@ static void handleWifiResult(net_mgmt_event_callback *cb, uint32_t mgmt_event, n
 cs_err_t Wifi::init(const char *ssid, const char *psk)
 {
 	if (_initialized) {
-		LOG_ERR("Already initialized");
+		LOG_ERR("%s", "Already initialized");
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
 
@@ -158,12 +158,12 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
 cs_err_t Wifi::connect()
 {
 	if (!_initialized) {
-		LOG_ERR("Not initialized");
+		LOG_ERR("%s", "Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}
 
 	if (net_mgmt(NET_REQUEST_WIFI_SCAN, _iface, NULL, 0) != 0) {
-		LOG_ERR("Scan request failed");
+		LOG_ERR("%s", "Scan request failed");
 		return CS_ERR_WIFI_SCAN_REQUEST_FAILED;
 	}
 
@@ -171,7 +171,7 @@ cs_err_t Wifi::connect()
 	// return so connection can be reattempted
 	if (k_event_wait(&_evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT, true,
 			 K_MSEC(CS_WIFI_SCAN_TIMEOUT)) == 0) {
-		LOG_ERR("Timeout on waiting for scan result");
+		LOG_ERR("%s", "Timeout on waiting for scan result");
 		return CS_ERR_WIFI_SCAN_RESULT_TIMEOUT;
 	}
 
@@ -188,7 +188,7 @@ cs_err_t Wifi::connect()
 
 	if (net_mgmt(NET_REQUEST_WIFI_CONNECT, _iface, &_cnx_params,
 		     sizeof(wifi_connect_req_params)) != 0) {
-		LOG_ERR("Wifi connect request failed");
+		LOG_ERR("%s", "Wifi connect request failed");
 	}
 
 	return CS_OK;
@@ -204,7 +204,7 @@ cs_err_t Wifi::disconnect()
 	_disconnecting = true;
 
 	if (net_mgmt(NET_REQUEST_WIFI_DISCONNECT, _iface, NULL, 0) != 0) {
-		LOG_ERR("Disconnect request failed");
+		LOG_ERR("%s", "Disconnect request failed");
 		return CS_ERR_WIFI_DISCONNECT_REQUEST_FAILED;
 	}
 

@@ -182,7 +182,7 @@ cs_err_t WebSocket::init(cs_socket_opts *opts)
 cs_err_t WebSocket::connect(const char *url)
 {
 	if (!_initialized) {
-		LOG_ERR("Not initialized");
+		LOG_ERR("%s", "Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}
 
@@ -250,7 +250,7 @@ void WebSocket::sendMessage(void *cls, uint8_t *msg, int msg_len)
 	WebSocket *ws_inst = static_cast<WebSocket *>(cls);
 
 	if (!ws_inst->_initialized) {
-		LOG_ERR("Not initialized");
+		LOG_ERR("%s", "Not initialized");
 		return;
 	}
 
@@ -272,7 +272,7 @@ void WebSocket::sendMessage(void *cls, uint8_t *msg, int msg_len)
 cs_err_t WebSocket::close()
 {
 	if (!_initialized) {
-		LOG_ERR("Not initialized");
+		LOG_ERR("%s", "Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}
 

@@ -54,7 +54,7 @@ void HttpClient::init(cs_socket_opts *opts)
 cs_err_t HttpClient::sendHttpRequest(http_method method, const char *endpoint, const char *payload)
 {
 	if (!_initialized) {
-		LOG_ERR("Not initialized");
+		LOG_ERR("%s", "Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
 	}
 
@@ -92,7 +92,7 @@ cs_err_t HttpClient::sendHttpRequest(http_method method, const char *endpoint, c
 
 	if (http_client_req(_sock_id, &http_req, CS_HTTP_CLIENT_RECV_TIMEOUT, (char *)endpoint) <
 	    0) {
-		LOG_ERR("Failed to send http request");
+		LOG_ERR("%s", "Failed to send http request");
 		return CS_ERR_SOCKET_HTTP_REQ_FAILED;
 	}
 

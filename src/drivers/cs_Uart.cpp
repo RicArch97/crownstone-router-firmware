@@ -63,7 +63,7 @@ static void handleUartInterrupt(const device *dev, void *user_data)
 		uint8_t c;
 		// read one byte from the uart fifo queue
 		if (uart_fifo_read(dev, &c, 1) != 1) {
-			LOG_ERR("Failed to read from uart fifo");
+			LOG_ERR("%s", "Failed to read from uart fifo");
 			return;
 		}
 
@@ -118,7 +118,7 @@ static void handleUartInterrupt(const device *dev, void *user_data)
 cs_err_t Uart::init(cs_uart_config *cfg)
 {
 	if (_initialized) {
-		LOG_ERR("Already initialized");
+		LOG_ERR("%s", "Already initialized");
 		return CS_ERR_ALREADY_INITIALIZED;
 	}
 
@@ -160,14 +160,14 @@ cs_err_t Uart::init(cs_uart_config *cfg)
 				uart_cfg.stop_bits = cfg->stop_bits;
 				break;
 			default:
-				LOG_ERR("Invalid parity bit option provided");
+				LOG_ERR("%s", "Invalid parity bit option provided");
 				return CS_ERR_UART_CONFIG_INVALID;
 			}
 		}
 	}
 
 	if (uart_configure(_uart_dev, &uart_cfg) != 0) {
-		LOG_ERR("Failed to configure uart");
+		LOG_ERR("%s", "Failed to configure uart");
 		return CS_ERR_UART_CONFIG_FAILED;
 	}
 
