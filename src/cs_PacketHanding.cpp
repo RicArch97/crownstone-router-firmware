@@ -170,10 +170,11 @@ static void loadSwitchCommandPacket(cs_router_switch_command_packet *switch_pkt,
  * @brief Register a handler that can be used for data transport.
  *
  * @param inst_id Instance ID of the instance that handle transport
- * @param handle_func Function pointer to function that should be called from the intstance
+ * @param inst Pointer to class instance according to instance ID
+ * @param cb Function pointer to function that should be called with the instance.
  */
-void PacketHandler::registerTransportHandler(cs_router_instance_id inst_id, void *cls,
-					     void (*handle_func)(void *, uint8_t *, int))
+void PacketHandler::registerTransportHandler(cs_router_instance_id inst_id, void *inst,
+					     cs_packet_transport_cb_t cb)
 {
 	for (int i = 0; i < _handler_ctr; i++) {
 		if (_handlers[i].id == inst_id) {
@@ -182,7 +183,7 @@ void PacketHandler::registerTransportHandler(cs_router_instance_id inst_id, void
 		}
 	}
 	// store handler
-	_handlers[_handler_ctr++] = {inst_id, cls, handle_func};
+	_handlers[_handler_ctr++] = {inst_id, inst, cb};
 }
 
 /**
@@ -197,7 +198,7 @@ void PacketHandler::transportPacket(cs_router_instance_id inst_id, uint8_t *buff
 {
 	for (int i = 0; i < _handler_ctr; i++) {
 		if (_handlers[i].id == inst_id) {
-			_handlers[i].handler(_handlers[i].cls, buffer, buffer_len);
+			_handlers[i].cb(_handlers[i].inst, buffer, buffer_len);
 			return;
 		}
 	}

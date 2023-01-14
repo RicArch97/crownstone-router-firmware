@@ -17,13 +17,13 @@ K_THREAD_STACK_DEFINE(uart_tid_stack_area, CS_UART_THREAD_STACK_SIZE);
 /**
  * @brief Thread function that handles messages in the UART message queue.
  *
- * @param cls Pointer to the class instance.
+ * @param inst Pointer to the class instance.
  * @param unused1 Unused parameter, is NULL.
  * @param unused2 Unused parameter, is NULL.
  */
-static void handleUartMessages(void *cls, void *unused1, void *unused2)
+static void handleUartMessages(void *inst, void *unused1, void *unused2)
 {
-	Uart *uart_inst = static_cast<Uart *>(cls);
+	Uart *uart_inst = static_cast<Uart *>(inst);
 
 	uint8_t msg_buf[CS_UART_BUFFER_SIZE];
 
@@ -193,13 +193,13 @@ cs_err_t Uart::init(cs_uart_config *cfg)
 /**
  * @brief Transmit a message over UART. Callback function for PacketHandler.
  *
- * @param cls Pointer to UART class instance.
+ * @param inst Pointer to UART class instance.
  * @param msg Pointer to the buffer with the message data.
  * @param msg_len Length of the message data.
  */
-void Uart::sendUartMessage(void *cls, uint8_t *msg, int msg_len)
+void Uart::sendUartMessage(void *inst, uint8_t *msg, int msg_len)
 {
-	Uart *uart_inst = static_cast<Uart *>(cls);
+	Uart *uart_inst = static_cast<Uart *>(inst);
 
 	memcpy(uart_inst->_uart_buf, msg, msg_len);
 	uart_inst->_uart_buf_ctr = msg_len;

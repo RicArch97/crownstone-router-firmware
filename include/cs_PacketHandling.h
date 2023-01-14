@@ -18,10 +18,12 @@
 #define CS_PACKET_UART_START_TOKEN 0x7E
 #define CS_PACKET_UART_CRC_SEED	   0xFFFF
 
+typedef void (*cs_packet_transport_cb_t)(void *, uint8_t *, int);
+
 struct cs_packet_handler {
 	cs_router_instance_id id;
-	void *cls;
-	void (*handler)(void *, uint8_t *, int);
+	void *inst;
+	cs_packet_transport_cb_t cb;
 };
 
 class PacketHandler
@@ -29,8 +31,8 @@ class PacketHandler
       public:
 	PacketHandler() = default;
 
-	void registerTransportHandler(cs_router_instance_id inst_id, void *cls,
-				      void (*handle_func)(void *, uint8_t *, int));
+	void registerTransportHandler(cs_router_instance_id inst_id, void *inst,
+				      cs_packet_transport_cb_t cb);
 	void unregisterTransportHandler(cs_router_instance_id inst_id);
 	void handleIncomingPacket(uint8_t *buffer, bool is_uart_pkt);
 	void handlePeripheralData(cs_router_instance_id src_id, cs_router_instance_id dest_id,

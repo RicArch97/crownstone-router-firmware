@@ -38,13 +38,13 @@ static int handleWebsocketConnect(int ws_sock, http_request *req, void *user_dat
  * @brief Handle sending messages on the websocket.
  * Runs in a dedicated thread.
  *
- * @param cls Pointer to the class instance.
+ * @param inst Pointer to the class instance.
  * @param unused1 Unused parameter, is NULL.
  * @param unused2 Unused parameter, is NULL.
  */
-static void handleMessageSend(void *cls, void *unused1, void *unused2)
+static void handleMessageSend(void *inst, void *unused1, void *unused2)
 {
-	WebSocket *ws_inst = static_cast<WebSocket *>(cls);
+	WebSocket *ws_inst = static_cast<WebSocket *>(inst);
 
 	k_mbox_msg driver_msg;
 	uint8_t driver_msg_buf[CS_PACKET_BUF_SIZE];
@@ -91,13 +91,13 @@ static void handleMessageSend(void *cls, void *unused1, void *unused2)
  * @brief Handle receiving messages on the websocket.
  * Runs in a dedicated thread.
  *
- * @param cls Pointer to the class instance.
+ * @param inst Pointer to the class instance.
  * @param unused1 Unused parameter, is NULL.
  * @param unused2 Unused parameter, is NULL.
  */
-static void handleMessageReceive(void *cls, void *unused1, void *unused2)
+static void handleMessageReceive(void *inst, void *unused1, void *unused2)
 {
-	WebSocket *ws_inst = static_cast<WebSocket *>(cls);
+	WebSocket *ws_inst = static_cast<WebSocket *>(inst);
 
 	uint32_t message_type;
 	uint64_t remaining_bytes = ULLONG_MAX;
@@ -241,13 +241,13 @@ cs_err_t WebSocket::connect(const char *url)
  * @brief Send message over websocket by putting it in a mailbox.
  * Callback function for PacketHandler.
  *
- * @param cls Pointer to UART class instance.
+ * @param inst Pointer to UART class instance.
  * @param message Pointer to buffer with the message.
  * @param len Length of the message.
  */
-void WebSocket::sendMessage(void *cls, uint8_t *msg, int msg_len)
+void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
 {
-	WebSocket *ws_inst = static_cast<WebSocket *>(cls);
+	WebSocket *ws_inst = static_cast<WebSocket *>(inst);
 
 	if (!ws_inst->_initialized) {
 		LOG_ERR("%s", "Not initialized");
