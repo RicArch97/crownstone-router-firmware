@@ -171,7 +171,7 @@ cs_err_t Wifi::connect()
 	// return so connection can be reattempted
 	if (k_event_wait(&_evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT, true,
 			 K_MSEC(CS_WIFI_SCAN_TIMEOUT)) == 0) {
-		LOG_ERR("%s", "Timeout on waiting for scan result");
+		LOG_WRN("%s", "Timeout on waiting for scan result");
 		return CS_ERR_WIFI_SCAN_RESULT_TIMEOUT;
 	}
 

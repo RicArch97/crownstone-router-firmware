@@ -8,7 +8,7 @@
 #include "drivers/cs_Uart.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(cs_Uart, LOG_LEVEL_INF);
 
 #include <string.h>
 
@@ -100,7 +100,6 @@ static void handleUartInterrupt(const device *dev, void *user_data)
 
 		// check if all bytes were transmitted to avoid corrupted message
 		if (uart_irq_tx_complete(dev)) {
-			k_free(uart_inst->_uart_buf);
 			uart_irq_tx_disable(dev);
 			uart_irq_rx_enable(dev);
 		}

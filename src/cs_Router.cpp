@@ -30,13 +30,28 @@ int main(void)
 	Wifi *wifi = &Wifi::getInstance();
 	if (wifi->init(TEST_SSID, TEST_PSK) == CS_OK) {
 		LOG_INF("%s", "Wifi initialized");
-		if (wifi->connect() == CS_OK) {
-			LOG_INF("%s", "Wifi connection request done");
-		}
+		// retry if scan result did not contain our SSID
+		int conn_ret = CS_OK;
+		do {
+			conn_ret = wifi->connect();
+		} while (conn_ret == CS_ERR_WIFI_SCAN_RESULT_TIMEOUT);
+		LOG_INF("%s", "Wifi connection request done");
 	}
 
 	// wait till wifi connection is established before creating websocket
 	k_event_wait(&wifi->_evt_connected, CS_WIFI_CONNECTED_EVENT, true, K_FOREVER);
+
+	PacketHandler pkt_handler;
+
+	const device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
+	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485, CS_INSTANCE_ID_CLOUD, &pkt_handler);
+	WebSocket web_socket(&pkt_handler);
+
+	// register instances with transport callbacks
+	pkt_handler.registerTransportHandler(CS_INSTANCE_ID_UART_RS485, &rs485,
+					     Uart::sendUartMessage);
+	pkt_handler.registerTransportHandler(CS_INSTANCE_ID_CLOUD, &web_socket,
+					     WebSocket::sendMessage);
 
 	cs_socket_host_addr ws_host_addr;
 	ws_host_addr.peer_addr = HOST_ADDR;
@@ -47,18 +62,6 @@ int main(void)
 	ws_opts.host_mode = CS_SOCKET_HOST_ADDR;
 	ws_opts.ip_ver = CS_SOCKET_IPV4;
 	ws_opts.addr = &ws_host_addr;
-
-	PacketHandler pkt_handler;
-	WebSocket web_socket;
-
-	const device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
-	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485, CS_INSTANCE_ID_CLOUD, &pkt_handler);
-
-	// register instances with transport callbacks
-	pkt_handler.registerTransportHandler(CS_INSTANCE_ID_UART_RS485, &rs485,
-					     Uart::sendUartMessage);
-	pkt_handler.registerTransportHandler(CS_INSTANCE_ID_CLOUD, &web_socket,
-					     WebSocket::sendMessage);
 
 	if (web_socket.init(&ws_opts) == CS_OK) {
 		LOG_INF("%s", "Websocket initialized");

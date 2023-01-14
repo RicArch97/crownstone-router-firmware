@@ -29,7 +29,7 @@ static int wrapUartPacket(uint8_t type, uint8_t *payload, int payload_len, uint8
 	int uart_pkt_len = (sizeof(cs_router_uart_packet) - sizeof(uint8_t *)) + payload_len;
 
 	pkt_buf[uart_pkt_ctr++] = CS_PACKET_UART_START_TOKEN;
-	sys_put_be16(uart_pkt_len - 3, pkt_buf + uart_pkt_ctr);
+	sys_put_le16(uart_pkt_len - 3, pkt_buf + uart_pkt_ctr);
 	uart_pkt_ctr += 2;
 	pkt_buf[uart_pkt_ctr++] = CS_UART_PROTOCOL_VERSION;
 	pkt_buf[uart_pkt_ctr++] = type;
@@ -39,7 +39,7 @@ static int wrapUartPacket(uint8_t type, uint8_t *payload, int payload_len, uint8
 	// calculate CRC16 CCITT over everything after length (so
 	// don't include start token and length)
 	uint16_t crc = crc16_ccitt(CS_PACKET_UART_CRC_SEED, pkt_buf + 3, uart_pkt_ctr - 3);
-	sys_put_be16(crc, pkt_buf + uart_pkt_ctr);
+	sys_put_le16(crc, pkt_buf + uart_pkt_ctr);
 
 	return uart_pkt_len;
 }
@@ -58,7 +58,7 @@ static int wrapGenericPacket(uint8_t type, uint8_t *payload, int payload_len, ui
 {
 	pkt_buf[0] = CS_PROTOCOL_VERSION;
 	pkt_buf[1] = type;
-	sys_put_be16(payload_len, pkt_buf + 2);
+	sys_put_le16(payload_len, pkt_buf + 2);
 	memcpy(pkt_buf + 4, payload, payload_len);
 
 	return (sizeof(cs_router_generic_packet) - sizeof(uint8_t *)) + payload_len;
@@ -77,7 +77,7 @@ static int wrapGenericPacket(uint8_t type, uint8_t *payload, int payload_len, ui
 static int wrapDataPacket(uint8_t src_id, uint8_t *payload, int payload_len, uint8_t *pkt_buf)
 {
 	pkt_buf[0] = src_id;
-	sys_put_be16(payload_len, pkt_buf + 1);
+	sys_put_le16(payload_len, pkt_buf + 1);
 	memcpy(pkt_buf + 3, payload, payload_len);
 
 	return (sizeof(cs_router_data_packet) - sizeof(uint8_t *)) + payload_len;
@@ -94,7 +94,7 @@ static void loadUartPacket(cs_router_uart_packet *uart_pkt, uint8_t *buffer)
 	int pkt_ctr = 0;
 
 	uart_pkt->start_token = buffer[pkt_ctr++];
-	uart_pkt->length = sys_get_be16(buffer + pkt_ctr);
+	uart_pkt->length = sys_get_le16(buffer + pkt_ctr);
 	pkt_ctr += 2;
 	uart_pkt->protocol_version = buffer[pkt_ctr++];
 	uart_pkt->type = buffer[pkt_ctr++];
@@ -105,7 +105,7 @@ static void loadUartPacket(cs_router_uart_packet *uart_pkt, uint8_t *buffer)
 
 	// check CRC CCITT over everything after length, not including CRC (uint16) itself
 	uint16_t check_crc = crc16_ccitt(CS_PACKET_UART_CRC_SEED, buffer + 3, uart_pkt->length - 2);
-	uint16_t received_crc = sys_get_be16(buffer + pkt_ctr);
+	uint16_t received_crc = sys_get_le16(buffer + pkt_ctr);
 	// CRC doesn't match, invalid packet
 	if (check_crc != received_crc) {
 		LOG_WRN("CRC mismatch on received UART packet. Calculated: %hu, Received: %hu",
@@ -126,7 +126,7 @@ static void loadGenericPacket(cs_router_generic_packet *generic_pkt, uint8_t *bu
 
 	generic_pkt->protocol_version = buffer[pkt_ctr++];
 	generic_pkt->type = buffer[pkt_ctr++];
-	generic_pkt->length = sys_get_be16(buffer + pkt_ctr);
+	generic_pkt->length = sys_get_le16(buffer + pkt_ctr);
 	pkt_ctr += 2;
 	generic_pkt->payload = &buffer[pkt_ctr];
 
@@ -149,7 +149,7 @@ static void loadControlPacket(cs_router_control_packet *ctrl_pkt, uint8_t *buffe
 
 	ctrl_pkt->command_type = buffer[pkt_ctr++];
 	ctrl_pkt->dest_id = buffer[pkt_ctr++];
-	ctrl_pkt->length = sys_get_be16(buffer + pkt_ctr);
+	ctrl_pkt->length = sys_get_le16(buffer + pkt_ctr);
 	pkt_ctr += 2;
 	ctrl_pkt->payload = &buffer[pkt_ctr];
 }

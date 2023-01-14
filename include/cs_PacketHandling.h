@@ -29,8 +29,6 @@ struct cs_packet_handler {
 class PacketHandler
 {
       public:
-	PacketHandler() = default;
-
 	void registerTransportHandler(cs_router_instance_id inst_id, void *inst,
 				      cs_packet_transport_cb_t cb);
 	void unregisterTransportHandler(cs_router_instance_id inst_id);
