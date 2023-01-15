@@ -48,7 +48,7 @@ mv ~/crownstone-router-firmware ~/zephyr-workspace/zephyr/
 
 #### Regular
 
-It is recommended to create a virtual machine for Python dependencies.
+It is recommended to create a virtual environment for Python dependencies.
 
 First install `python3-venv` using your system's package manager
 
