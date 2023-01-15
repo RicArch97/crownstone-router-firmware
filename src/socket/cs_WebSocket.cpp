@@ -14,6 +14,7 @@ LOG_MODULE_REGISTER(cs_WebSocket, LOG_LEVEL_INF);
 #include <zephyr/net/websocket.h>
 
 #include <string.h>
+#include <stdio.h>
 #include <errno.h>
 #include <limits.h>
 
@@ -175,7 +176,7 @@ cs_err_t WebSocket::init(cs_socket_opts *opts)
  * @brief Open a websocket connection.
  *
  * @param url URL of the websocket, excluding the domain name or peer address and forward slash.
- * NULL if not required.
+ * Max 64 characters, the rest is dropped. NULL if not required.
  *
  * @return CS_OK if connection is successful.
  */
@@ -187,7 +188,7 @@ cs_err_t WebSocket::connect(const char *url)
 	}
 
 	if (zsock_connect(_sock_id, _addr, _addr_len) < 0) {
-		LOG_ERR("Failed to connect to socket host: %d", -errno);
+		LOG_ERR("Failed to connect to socket host with errno: %d", -errno);
 		return CS_ERR_SOCKET_CONNECT_FAILED;
 	}
 
@@ -205,20 +206,25 @@ cs_err_t WebSocket::connect(const char *url)
 		return CS_ERR_SOCKET_WEBSOCKET_GET_IP_INFO_FAILED;
 	}
 
+	char url_buf[CS_WEBSOCKET_URL_MAX_LEN];
 	char url_prefix[] = "/";
+	strcat(url_buf, url_prefix);
+	// create url from forward slash + url if url provided
+	if (url != NULL) {
+		strncat(url_buf, url, (sizeof(url_buf) - sizeof(url_prefix)));
+	}
 
 	ws_req.host = addr;
-	ws_req.url = url == NULL ? url_prefix : strcat(url_prefix, url);
+	ws_req.url = url_buf;
 	ws_req.cb = handleWebsocketConnect;
 	ws_req.tmp_buf = _websocket_recv_temp_buf;
 	ws_req.tmp_buf_len = sizeof(_websocket_recv_temp_buf);
 
-	// perform http handshake for websocket connection
-
+	// perform http handshake for websocket connection, and open connection
 	_websock_id = websocket_connect(_sock_id, &ws_req, CS_WEBSOCKET_RECV_TIMEOUT, this);
 	if (_websock_id < 0) {
-		LOG_ERR("Failed to connect to websocket on %s", _host_name);
-		zsock_close(_sock_id);
+		LOG_ERR("Failed to connect to websocket on %s%s", addr, url_buf);
+		close();
 		return CS_ERR_SOCKET_WEBSOCKET_CONNECT_FAILED;
 	}
 

@@ -1,3 +1,9 @@
+// / {
+// 	aliases {
+// 		w5500-ethernet = &w5500;
+// 	};
+// };
+
 // Enable ESP32 Wifi
 &wifi {
 	status = "okay";
@@ -11,11 +17,11 @@
 // Enable W5500 Ethernet module
 // &spi3 {
 // 	status = "okay";
+// 	clock-frequency = <1000000>;
 // 	w5500: w5500@0 {
 // 		compatible = "wiznet,w5500";
 // 		reg = <0>;
-// 		spi-max-frequency = <18000000>;
-//     int-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
-//     reset-gpios = <&gpio0 27 GPIO_ACTIVE_LOW>;
+// 		spi-max-frequency = <1000000>;
+//     int-gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
 // 	};
 // };

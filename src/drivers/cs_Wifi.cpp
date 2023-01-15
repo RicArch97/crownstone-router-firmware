@@ -122,7 +122,7 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
 		return CS_ERR_DEVICE_NOT_READY;
 	}
 
-	_iface = net_if_get_default();
+	_iface = net_if_lookup_by_dev(wifi_dev);
 	// Get the default network interface
 	if (_iface == NULL) {
 		LOG_ERR("No interface with device %s is configured", _iface->if_dev->dev->name);
