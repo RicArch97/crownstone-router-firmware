@@ -73,12 +73,14 @@ enum cs_router_generic_packet_type : uint8_t {
  * @brief Frame struct for a control packet.
  *
  * @param command_type Type of the command
- * @param dest_id The id of the destination device
+ * @param src_id The id of the source device, used to send result packet back
+ * @param dest_id The id of the destination device that should receive this command
  * @param length Length of the payload
  * @param payload Payload according to the command type, depends on length
  */
 struct cs_router_control_packet {
 	uint8_t command_type;
+	uint8_t src_id;
 	uint8_t dest_id;
 	uint16_t length;
 	uint8_t *payload;
@@ -132,12 +134,9 @@ enum cs_router_result_code : uint8_t {
 	CS_RESULT_TYPE_SUCCES,
 	CS_RESULT_TYPE_WAIT_FOR_SUCCESS,
 	CS_RESULT_TYPE_SUCCESS_NO_CHANGE,
-	CS_RESULT_TYPE_BUFFER_UNASSIGNED = (1 << 3),
-	CS_RESULT_TYPE_BUFFER_TOO_SMALL,
+	CS_RESULT_TYPE_BUFFER_TOO_SMALL = (1 << 3),
 	CS_RESULT_TYPE_WRONG_PAYLOAD_LENGTH = (1 << 4),
 	CS_RESULT_TYPE_UNKNOWN_TYPE,
-	CS_RESULT_TYPE_NO_SPACE,
-	CS_RESULT_TYPE_BUSY,
 	CS_RESULT_TYPE_TIMEOUT,
 	CS_RESULT_TYPE_CANCELED,
 	CS_RESULT_TYPE_PROTOCOL_UNSUPPORTED,
@@ -145,6 +144,7 @@ enum cs_router_result_code : uint8_t {
 	CS_RESUKT_TYPE_NOT_IMPLEMENTED = (1 << 5),
 	CS_RESULT_TYPE_NOT_INITIALIZED,
 	CS_RESULT_TYPE_READ_FAILED,
+	CS_RESULT_TYPE_EVENT_UNHANDLED,
 	CS_RESULT_TYPE_UNSPECIFIED = (1 << 7)
 };
 
@@ -166,15 +166,15 @@ enum cs_router_instance_id : uint8_t {
  * @brief Frame struct for a set config packet.
  *
  * @param config_type Type of configuration
- * @param persistence_mode Whether the configuration should be stored
- * @param length Length of the payload
+ * @param config_id Identifier for the configuration to set
+ * @param persistence_mode Type of persistence mode
  * @param payload Payload according to the config type
  * @param reserved Reserved for future use
  */
 struct cs_router_set_config_packet {
 	uint8_t config_type;
+	uint8_t config_id;
 	uint8_t persistence_mode;
-	uint8_t length;
 	uint8_t *payload;
 	uint8_t reserved;
 } __packed;
@@ -183,12 +183,46 @@ struct cs_router_set_config_packet {
  * @brief Frame struct for a get config packet.
  *
  * @param config_type Type of configuration
- * @param persistence_mode Whether the configuration should be stored
+ * @param config_id Identifier for the configuration to get
+ * @param persistence_mode Type of persistence mode
  * @param reserved Reserved for future use
  */
 struct cs_router_get_config_packet {
 	uint8_t config_type;
+	uint8_t config_id;
 	uint8_t persistence_mode;
+	uint8_t reserved;
+} __packed;
+
+/**
+ * @brief Frame struct for a set config result packet.
+ *
+ * @param config_type Type of configuration that was set
+ * @param config_id Identifier for the configuration that was set
+ * @param persistence_mode Type of persistence mode used
+ * @param reserved Reserved for future use
+ */
+struct cs_router_set_config_result_packet {
+	uint8_t config_type;
+	uint8_t config_id;
+	uint8_t persistence_mode;
+	uint8_t reserved;
+} __packed;
+
+/**
+ * @brief Frame struct for a get config result packet.
+ *
+ * @param config_type Type of configuration that was requested
+ * @param config_id Identifier for the configuration that was requested
+ * @param persistence_mode Type of persistence mode requested
+ * @param payload Payload according to the config type, containing the state
+ * @param reserved Reserved for future use
+ */
+struct cs_router_get_config_result_packet {
+	uint8_t config_type;
+	uint8_t config_id;
+	uint8_t persistence_mode;
+	uint8_t *payload;
 	uint8_t reserved;
 } __packed;
 
@@ -202,11 +236,20 @@ enum cs_router_config_type : uint8_t {
 };
 
 /**
- * @brief Set config & get config persistence modes.
+ * @brief Set config persistence modes.
  */
-enum cs_router_config_persistence_mode : uint8_t {
-	CS_CONFIG_PERSISTENCE_MODE_TEMPORARY,
-	CS_CONFIG_PERSISTENCE_MODE_STORED
+enum cs_router_set_config_persistence_mode : uint8_t {
+	CS_SET_CONFIG_PERSISTENCE_MODE_TEMPORARY,
+	CS_SET_CONFIG_PERSISTENCE_MODE_STORED
+};
+
+/**
+ * @brief Get config persistence modes.
+ */
+enum cs_router_get_config_persistence_mode : uint8_t {
+	CS_GET_CONFIG_PERSISTENCE_MODE_CURRENT,
+	CS_GET_CONFIG_PERSISTENCE_MODE_STORED,
+	CS_GET_CONFIG_PERSISTENCE_MODE_FIRMWARE_DEFAULT
 };
 
 /**

@@ -39,6 +39,15 @@ class PacketHandler
       private:
 	void transportPacket(cs_router_instance_id inst_id, uint8_t *buffer, int buffer_len);
 
+	int wrapUartPacket(uint8_t type, uint8_t *payload, int payload_len, uint8_t *pkt_buf);
+	int wrapGenericPacket(uint8_t type, uint8_t *payload, int payload_len, uint8_t *pkt_buf);
+	int wrapDataPacket(uint8_t src_id, uint8_t *payload, int payload_len, uint8_t *pkt_buf);
+
+	void loadUartPacket(cs_router_uart_packet *uart_pkt, uint8_t *buffer);
+	void loadGenericPacket(cs_router_generic_packet *generic_pkt, uint8_t *buffer);
+	void loadControlPacket(cs_router_control_packet *ctrl_pkt, uint8_t *buffer);
+	void loadSwitchCommandPacket(cs_router_switch_command_packet *switch_pkt, uint8_t *buffer);
+
 	cs_packet_handler _handlers[CS_INSTANCE_ID_AMOUNT];
 	int _handler_ctr = 0;
 };
