@@ -7,8 +7,6 @@
 
 #pragma once
 
-#include "cs_ReturnTypes.h"
-
 #include <zephyr/kernel.h>
 
 #include <stdint.h>

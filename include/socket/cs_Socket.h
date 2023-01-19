@@ -79,8 +79,8 @@ struct cs_socket_opts {
 class Socket
 {
       public:
-	cs_err_t init(struct cs_socket_opts *opts);
-	cs_err_t close();
+	cs_ret_code_t init(struct cs_socket_opts *opts);
+	cs_ret_code_t close();
 
 	/** ID of the socket */
 	int _sock_id = -1;

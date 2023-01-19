@@ -157,7 +157,7 @@ static void handleMessageReceive(void *inst, void *unused1, void *unused2)
  *
  * @return CS_OK if the initialization was succesful.
  */
-cs_err_t WebSocket::init(cs_socket_opts *opts)
+cs_ret_code_t WebSocket::init(cs_socket_opts *opts)
 {
 	int ret = Socket::init(opts);
 	if (ret != CS_OK) {
@@ -180,7 +180,7 @@ cs_err_t WebSocket::init(cs_socket_opts *opts)
  *
  * @return CS_OK if connection is successful.
  */
-cs_err_t WebSocket::connect(const char *url)
+cs_ret_code_t WebSocket::connect(const char *url)
 {
 	if (!_initialized) {
 		LOG_ERR("%s", "Not initialized");
@@ -275,7 +275,7 @@ void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
 /**
  * @brief Close websocket & BSD socket.
  */
-cs_err_t WebSocket::close()
+cs_ret_code_t WebSocket::close()
 {
 	if (!_initialized) {
 		LOG_ERR("%s", "Not initialized");

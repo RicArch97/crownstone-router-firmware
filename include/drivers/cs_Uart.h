@@ -57,13 +57,19 @@ class Uart
 	 */
 	Uart(const device *dev, cs_router_instance_id src_id, cs_router_instance_id dest_id,
 	     PacketHandler *handler)
-		: _dest_id(dest_id), _src_id(src_id), _pkt_handler(handler), _uart_dev(dev){};
+		: _uart_dev(dev), _dest_id(dest_id), _src_id(src_id), _pkt_handler(handler){};
 	~Uart();
 
-	cs_err_t init(cs_uart_config *cfg);
+	cs_ret_code_t init(cs_uart_config *cfg);
 	void disable();
 
-	static void sendUartMessage(void *cls, uint8_t *msg, int msg_len);
+	static void sendUartMessage(void *inst, uint8_t *msg, int msg_len);
+
+	/** Initialized flag */
+	bool _initialized = false;
+
+	/** UART device structure, holding information about the current UART hardware */
+	const device *_uart_dev = NULL;
 
 	/** Destination id, where UART packets from this instance should be routed to */
 	cs_router_instance_id _dest_id;
@@ -86,11 +92,4 @@ class Uart
 	uint16_t _uart_buf_ctr = 0;
 	/** Pointer that points to the last handled byte in the UART buffer */
 	uint8_t *_uart_buf_ptr = NULL;
-
-      private:
-	/** Initialized flag */
-	bool _initialized = false;
-
-	/** UART device structure, holding information about the current UART hardware */
-	const device *_uart_dev = NULL;
 };

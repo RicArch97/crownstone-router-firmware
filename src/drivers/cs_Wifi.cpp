@@ -108,7 +108,7 @@ static void handleWifiResult(net_mgmt_event_callback *cb, uint32_t mgmt_event, n
  *
  * @return CS_OK if the wifi module was sucessfully initialized.
  */
-cs_err_t Wifi::init(const char *ssid, const char *psk)
+cs_ret_code_t Wifi::init(const char *ssid, const char *psk)
 {
 	if (_initialized) {
 		LOG_ERR("%s", "Already initialized");
@@ -155,7 +155,7 @@ cs_err_t Wifi::init(const char *ssid, const char *psk)
  *
  * @return CS_OK if if the scan request was done succesfully.
  */
-cs_err_t Wifi::connect()
+cs_ret_code_t Wifi::connect()
 {
 	if (!_initialized) {
 		LOG_ERR("%s", "Not initialized");
@@ -199,7 +199,7 @@ cs_err_t Wifi::connect()
  *
  * @return CS_OK if the disconnect request was done sucessfully.
  */
-cs_err_t Wifi::disconnect()
+cs_ret_code_t Wifi::disconnect()
 {
 	_disconnecting = true;
 

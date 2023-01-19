@@ -22,7 +22,7 @@ LOG_MODULE_REGISTER(cs_Socket, LOG_LEVEL_INF);
  *
  * @return CS_OK if the initialization is successful.
  */
-cs_err_t Socket::init(cs_socket_opts *opts)
+cs_ret_code_t Socket::init(cs_socket_opts *opts)
 {
 	if (_initialized) {
 		LOG_ERR("%s", "Already initialized");
@@ -125,7 +125,7 @@ cs_err_t Socket::init(cs_socket_opts *opts)
  *
  * @return CS_OK if the socket was closed.
  */
-cs_err_t Socket::close()
+cs_ret_code_t Socket::close()
 {
 	if (!_initialized) {
 		LOG_ERR("%s", "Not initialized");

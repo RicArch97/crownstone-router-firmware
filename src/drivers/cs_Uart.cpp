@@ -114,7 +114,7 @@ static void handleUartInterrupt(const device *dev, void *user_data)
  *
  * @return CS_OK if the UART module was sucessfully initialized.
  */
-cs_err_t Uart::init(cs_uart_config *cfg)
+cs_ret_code_t Uart::init(cs_uart_config *cfg)
 {
 	if (_initialized) {
 		LOG_ERR("%s", "Already initialized");
@@ -199,6 +199,11 @@ cs_err_t Uart::init(cs_uart_config *cfg)
 void Uart::sendUartMessage(void *inst, uint8_t *msg, int msg_len)
 {
 	Uart *uart_inst = static_cast<Uart *>(inst);
+
+	if (!uart_inst->_initialized) {
+		LOG_ERR("%s", "Not initialized");
+		return;
+	}
 
 	memcpy(uart_inst->_uart_buf, msg, msg_len);
 	uart_inst->_uart_buf_ctr = msg_len;

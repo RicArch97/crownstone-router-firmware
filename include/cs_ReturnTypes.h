@@ -7,7 +7,7 @@
 
 #pragma once
 
-typedef int cs_err_t;
+typedef int cs_ret_code_t;
 
 #define CS_OK	0
 #define CS_FAIL -1
@@ -40,3 +40,6 @@ typedef int cs_err_t;
 #define CS_ERR_SOCKET_CONNECT_FAILED		   0x409
 #define CS_ERR_SOCKET_WEBSOCKET_GET_IP_INFO_FAILED 0x410
 #define CS_ERR_SOCKET_WEBSOCKET_CONNECT_FAILED	   0x411
+
+#define CS_ERR_BLE_CENTRAL_BLUETOOTH_INIT_FAILED 0x501
+#define CS_ERR_BLE_CENTRAL_SCAN_START_FAILED	 0x502

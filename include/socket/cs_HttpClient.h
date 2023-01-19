@@ -30,7 +30,7 @@ class HttpClient : public Socket
 {
       public:
 	void init(cs_socket_opts *opts);
-	cs_err_t sendHttpRequest(http_method method, const char *endpoint, const char *payload);
+	cs_ret_code_t sendHttpRequest(http_method method, const char *endpoint, const char *payload);
 
       private:
 	/** Initialized flag */

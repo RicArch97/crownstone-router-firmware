@@ -21,7 +21,7 @@
 
 #define CS_WEBSOCKET_HTTP_HEADER_SIZE  30
 #define CS_WEBSOCKET_RECV_TIMEOUT      3000
-#define CS_WEBSOCKET_RECV_RETRY_TIMOUT 50
+#define CS_WEBSOCKET_RECV_RETRY_TIMOUT 100
 #define CS_WEBSOCKET_URL_MAX_LEN       32
 
 #define CS_WEBSOCKET_CONNECTED_EVENT 0x001
@@ -37,11 +37,14 @@ class WebSocket : public Socket
 	 */
 	WebSocket(PacketHandler *handler) : _pkt_handler(handler){};
 
-	cs_err_t init(cs_socket_opts *opts);
-	cs_err_t connect(const char *url);
-	cs_err_t close();
+	cs_ret_code_t init(cs_socket_opts *opts);
+	cs_ret_code_t connect(const char *url);
+	cs_ret_code_t close();
 
-	static void sendMessage(void *cls, uint8_t *msg, int msg_len);
+	static void sendMessage(void *inst, uint8_t *msg, int msg_len);
+
+	/** Initialized flag */
+	bool _initialized = false;
 
 	/** ID of the websocket */
 	int _websock_id = -1;
@@ -64,9 +67,6 @@ class WebSocket : public Socket
 	uint8_t _websocket_recv_temp_buf[CS_PACKET_BUF_SIZE + CS_WEBSOCKET_HTTP_HEADER_SIZE];
 
       private:
-	/** Initialized flag */
-	bool _initialized = false;
-
 	/** Pointer to the websocket receive thread structure */
 	k_tid_t _ws_recv_thread = NULL;
 	/** Pointer to the websocket send thread structure */

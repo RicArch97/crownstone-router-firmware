@@ -18,7 +18,7 @@
 #define CS_PACKET_UART_START_TOKEN 0x7E
 #define CS_PACKET_UART_CRC_SEED	   0xFFFF
 
-typedef void (*cs_packet_transport_cb_t)(void *, uint8_t *, int);
+typedef void (*cs_packet_transport_cb_t)(void *inst, uint8_t *msg, int msg_len);
 
 struct cs_packet_handler {
 	cs_router_instance_id id;
@@ -48,6 +48,9 @@ class PacketHandler
 	void loadControlPacket(cs_router_control_packet *ctrl_pkt, uint8_t *buffer);
 	void loadSwitchCommandPacket(cs_router_switch_command_packet *switch_pkt, uint8_t *buffer);
 
+	/** Register of callbacks for handling message buffer for instances */
 	cs_packet_handler _handlers[CS_INSTANCE_ID_AMOUNT];
+
+	/** Amount of callbacks currently registered */
 	int _handler_ctr = 0;
 };

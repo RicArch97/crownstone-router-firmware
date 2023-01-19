@@ -38,9 +38,9 @@ class Wifi
 	void operator=(Wifi const &) = delete;
 	void operator=(Wifi &&) = delete;
 
-	cs_err_t init(const char *ssid, const char *psk);
-	cs_err_t connect();
-	cs_err_t disconnect();
+	cs_ret_code_t init(const char *ssid, const char *psk);
+	cs_ret_code_t connect();
+	cs_ret_code_t disconnect();
 
 	/** SSID buffer, max 32 bytes (characters) */
 	uint8_t _ssid[WIFI_SSID_MAX_LEN];

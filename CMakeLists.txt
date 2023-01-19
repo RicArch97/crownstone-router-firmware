@@ -7,8 +7,9 @@ project(crownstone-router-firmware)
 
 FILE(GLOB app_sources src/*.cpp)
 FILE(GLOB app_sources_drivers src/drivers/*.cpp)
+FILE(GLOB app_sources_drivers_ble src/drivers/ble/*.cpp)
 FILE(GLOB app_sources_socket src/socket/*.cpp)
 
-target_sources(app PRIVATE ${app_sources} ${app_sources_drivers} ${app_sources_socket})
+target_sources(app PRIVATE ${app_sources} ${app_sources_drivers} ${app_sources_drivers_ble} ${app_sources_socket})
 target_include_directories(app PRIVATE include/)
 target_compile_options(app PRIVATE -fno-threadsafe-statics)

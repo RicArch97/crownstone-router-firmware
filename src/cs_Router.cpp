@@ -7,6 +7,7 @@
 
 #include "drivers/cs_Uart.h"
 #include "drivers/cs_Wifi.h"
+#include "drivers/ble/cs_BleCentral.h"
 #include "socket/cs_WebSocket.h"
 #include "cs_ReturnTypes.h"
 #include "cs_Router.h"
@@ -18,10 +19,10 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 
 #define RS485_DEVICE DT_NODELABEL(uart2)
 
-#define TEST_SSID "ssid"
-#define TEST_PSK  "psk"
+#define TEST_SSID "GNXF2AF24"
+#define TEST_PSK  "UHJ94ZVMKLS2"
 
-#define HOST_ADDR "addr"
+#define HOST_ADDR "192.168.1.143"
 #define HOST_PORT 14500
 #define HOST_NAME "CrownstoneRouter"
 
@@ -70,6 +71,12 @@ int main(void)
 
 	if (rs485.init(NULL) == CS_OK) {
 		LOG_INF("%s", "RS485 initialized");
+	}
+
+	BleCentral *ble = &BleCentral::getInstance();
+	if (ble->init() == CS_OK) {
+		LOG_INF("%s", "BLE central initialized");
+		ble->connect();
 	}
 
 	LOG_INF("%s", "Crownstone router initialized");

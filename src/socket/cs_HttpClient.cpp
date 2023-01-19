@@ -51,7 +51,7 @@ void HttpClient::init(cs_socket_opts *opts)
  * @param endpoint Endpoint / url of the request
  * @param payload Payload that should be send to the server, otherwise NULL
  */
-cs_err_t HttpClient::sendHttpRequest(http_method method, const char *endpoint, const char *payload)
+cs_ret_code_t HttpClient::sendHttpRequest(http_method method, const char *endpoint, const char *payload)
 {
 	if (!_initialized) {
 		LOG_ERR("%s", "Not initialized");
@@ -62,7 +62,7 @@ cs_err_t HttpClient::sendHttpRequest(http_method method, const char *endpoint, c
 	k_mutex_lock(&_mtx, K_FOREVER);
 
 	// create new socket for the request
-	cs_err_t ret = Socket::init(_opts);
+	cs_ret_code_t ret = Socket::init(_opts);
 	if (ret != CS_OK) {
 		return ret;
 	}
