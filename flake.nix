@@ -26,6 +26,8 @@
 
     # Nixpkgs instantiated for supported system types
     nixpkgsFor = forAllSystems (system: import nixpkgs {inherit system;});
+
+    lib = nixpkgs.lib;
   in {
     devShells = forAllSystems (
       system: let
@@ -124,26 +126,46 @@
           };
 
         # udev rules for microcontrollers
-        zephyrRules = let
-          name = "zephyr-udev-rules";
-          url = "https://sf.net/p/openocd/code/ci/master/tree/contrib/60-openocd.rules?format=raw";
+        openocdEsp32 = let
+          pname = "openocd-esp32";
+          version = "0.11.0-esp32-20221026";
+
+          system_fixup = {
+            x86_64-linux = "linux-amd64";
+            aarch64-linux = "linux-arm64";
+          };
+
+          url = "https://github.com/espressif/openocd-esp32/releases/download/v${version}/${pname}-${system_fixup.${system}}-${version}.tar.gz";
         in
-          pkgs.stdenvNoCC.mkDerivation {
-            inherit name;
+          pkgs.stdenv.mkDerivation {
+            inherit pname version;
 
             src = builtins.fetchurl {
               inherit url;
-              sha256 = "093ihdz706kw65z4ddihgnm2sql9s1zlb9a128pb5h5l8l7jhmfj";
+              sha256 = "02vx9rs2dc3yg0f6fx7y5b23cw5s4b6aphjxv9icqq5bvyqyjqyf";
             };
 
-            # not an archive
-            dontUnpack = true;
+            nativeBuildInputs = [pkgs.autoPatchelfHook];
+
+            buildInputs = [pkgs.zlib pkgs.hidapi pkgs.libftdi1 pkgs.libusb1 pkgs.libgpiod];
 
             installPhase = ''
-              mkdir -p $out/etc/udev/rules.d
-              cp $src $out/etc/udev/rules.d/60-openocd.rules
+              mkdir -p $out
+              cp -r bin share $out
+
+              mkdir -p "$out/etc/udev/rules.d"
+              rules="$out/share/openocd/contrib/60-openocd.rules"
+              if [ ! -f "$rules" ]; then
+                  echo "$rules is missing, must update the Nix file."
+                  exit 1
+              fi
+              ln -s "$rules" "$out/etc/udev/rules.d/"
             '';
           };
+
+        esp32DebugBuild = pkgs.writeShellScriptBin "esp32-debug-build" ''
+          west build -b esp32 $1 -- -DOPENOCD=${openocdEsp32}/bin/openocd -DOPENOCD_DEFAULT_PATH=${openocdEsp32}/share/openocd/scripts
+        '';
       in {
         default = pkgs.mkShell {
           name = "zephyr-shell";
@@ -170,7 +192,8 @@
             clang-tools
             zephyrDeps
             zephyrSdk
-            zephyrRules
+            openocdEsp32
+            esp32DebugBuild
           ];
 
           # When shell is created, start with a few Zephyr related environment variables defined.

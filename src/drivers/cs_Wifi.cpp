@@ -37,7 +37,7 @@ static void handleWifiScanResult(net_mgmt_event_callback *cb)
 		wifi_inst->_cnx_params.mfp = entry->mfp;
 
 		// post event once given ssid was matched
-		k_event_set(&wifi_inst->_evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT);
+		k_event_set(&wifi_inst->_wifi_evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT);
 	}
 }
 
@@ -54,7 +54,7 @@ static void handleWifiConnectionResult(net_mgmt_event_callback *cb)
 	if (status->status) {
 		LOG_ERR("Connection request failed (%d)", status->status);
 	} else {
-		k_event_set(&wifi_inst->_evt_connected, CS_WIFI_CONNECTED_EVENT);
+		k_event_set(&wifi_inst->_wifi_evt_connected, CS_WIFI_CONNECTED_EVENT);
 		LOG_INF("%s", "Connected");
 	}
 }
@@ -135,8 +135,8 @@ cs_ret_code_t Wifi::init(const char *ssid, const char *psk)
 	net_mgmt_add_event_callback(&wifi_mgmt_cb);
 
 	// init ssid found event and connected event
-	k_event_init(&_evt_ssid_found);
-	k_event_init(&_evt_connected);
+	k_event_init(&_wifi_evt_ssid_found);
+	k_event_init(&_wifi_evt_connected);
 
 	// clamp lengths to the max supported
 	_ssid_len = (uint8_t)CLAMP(strlen(ssid), 0, WIFI_SSID_MAX_LEN);
@@ -169,7 +169,7 @@ cs_ret_code_t Wifi::connect()
 
 	// it's possible the scan did not detect the given ssid
 	// return so connection can be reattempted
-	if (k_event_wait(&_evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT, true,
+	if (k_event_wait(&_wifi_evt_ssid_found, CS_WIFI_SSID_FOUND_EVENT, true,
 			 K_MSEC(CS_WIFI_SCAN_TIMEOUT)) == 0) {
 		LOG_WRN("%s", "Timeout on waiting for scan result");
 		return CS_ERR_WIFI_SCAN_RESULT_TIMEOUT;

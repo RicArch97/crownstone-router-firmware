@@ -55,9 +55,9 @@ class Wifi
 	wifi_connect_req_params _cnx_params = {0};
 
 	/** Event structure used for an event when wifi network is found */
-	k_event _evt_ssid_found;
+	k_event _wifi_evt_ssid_found;
 	/** Event structure used for an event when connection is established */
-	k_event _evt_connected;
+	k_event _wifi_evt_connected;
 
 	/** Flag used to indicate that a disconnection has been requested */
 	bool _disconnecting = false;

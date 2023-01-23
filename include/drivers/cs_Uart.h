@@ -24,11 +24,10 @@
 #define CS_UART_RS_BAUD_DEFAULT 9600
 
 #define CS_UART_BUFFER_SIZE	  256
-#define CS_UART_BUFFER_QUEUE_SIZE 10
+#define CS_UART_BUFFER_QUEUE_SIZE 5
 
-#define CS_UART_THREAD_PRIORITY	  K_PRIO_PREEMPT(5)
+#define CS_UART_THREAD_PRIORITY	  K_PRIO_PREEMPT(7)
 #define CS_UART_THREAD_STACK_SIZE 4096
-#define CS_UART_THREAD_SLEEP	  200
 
 /**
  * @brief UART serial parameters, that both ends should agree on.

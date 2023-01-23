@@ -10,6 +10,8 @@
 #include "cs_Router.h"
 #include "cs_ReturnTypes.h"
 
+#include <zephyr/kernel.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -29,6 +31,7 @@ struct cs_packet_handler {
 class PacketHandler
 {
       public:
+	void init();
 	void registerTransportHandler(cs_router_instance_id inst_id, void *inst,
 				      cs_packet_transport_cb_t cb);
 	void unregisterTransportHandler(cs_router_instance_id inst_id);
@@ -50,6 +53,9 @@ class PacketHandler
 
 	/** Register of callbacks for handling message buffer for instances */
 	cs_packet_handler _handlers[CS_INSTANCE_ID_AMOUNT];
+
+	/** Mutex to protect handlers */
+	k_mutex _pkth_mtx;
 
 	/** Amount of callbacks currently registered */
 	int _handler_ctr = 0;

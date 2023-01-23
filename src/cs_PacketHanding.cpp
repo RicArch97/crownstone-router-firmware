@@ -14,6 +14,14 @@ LOG_MODULE_REGISTER(cs_PacketHandling, LOG_LEVEL_INF);
 #include <zephyr/sys/crc.h>
 
 /**
+ * @brief Initialize PacketHandler instance.
+ */
+void PacketHandler::init()
+{
+	k_mutex_init(&_pkth_mtx);
+}
+
+/**
  * @brief Register a handler that can be used for data transport.
  *
  * @param inst_id Instance ID of the instance that handle transport
@@ -23,6 +31,8 @@ LOG_MODULE_REGISTER(cs_PacketHandling, LOG_LEVEL_INF);
 void PacketHandler::registerTransportHandler(cs_router_instance_id inst_id, void *inst,
 					     cs_packet_transport_cb_t cb)
 {
+	k_mutex_lock(&_pkth_mtx, K_FOREVER);
+
 	for (int i = 0; i < _handler_ctr; i++) {
 		if (_handlers[i].id == inst_id) {
 			LOG_ERR("Handler with ID %d already registered", inst_id);
@@ -31,6 +41,8 @@ void PacketHandler::registerTransportHandler(cs_router_instance_id inst_id, void
 	}
 	// store handler
 	_handlers[_handler_ctr++] = {inst_id, inst, cb};
+
+	k_mutex_unlock(&_pkth_mtx);
 }
 
 /**
@@ -40,6 +52,8 @@ void PacketHandler::registerTransportHandler(cs_router_instance_id inst_id, void
  */
 void PacketHandler::unregisterTransportHandler(cs_router_instance_id inst_id)
 {
+	k_mutex_lock(&_pkth_mtx, K_FOREVER);
+
 	for (int i = 0; i < _handler_ctr; i++) {
 		if (_handlers[i].id == inst_id) {
 			// clean from register by shifting next data to removed slot
@@ -51,6 +65,8 @@ void PacketHandler::unregisterTransportHandler(cs_router_instance_id inst_id)
 		}
 	}
 	LOG_ERR("Could not find handler for ID %d", inst_id);
+
+	k_mutex_unlock(&_pkth_mtx);
 }
 
 /**
@@ -120,8 +136,6 @@ void PacketHandler::handlePeripheralData(cs_router_instance_id src_id,
 					 generic_pkt_len, pkt_buf);
 	}
 
-	// transport functions either copy the data or wait before buffer
-	// is processed before reaching the end of function
 	transportPacket(dest_id, pkt_buf, pkt_len);
 }
 
