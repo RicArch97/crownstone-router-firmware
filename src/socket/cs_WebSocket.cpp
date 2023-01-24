@@ -27,7 +27,7 @@ static int handleWebsocketConnect(int ws_sock, http_request *req, void *user_dat
 {
 	WebSocket *ws_inst = static_cast<WebSocket *>(user_data);
 
-	k_event_set(&ws_inst->_ws_evt_connected, CS_WEBSOCKET_CONNECTED_EVENT);
+	k_event_post(&ws_inst->_ws_evts, CS_WEBSOCKET_CONNECTED_EVENT);
 
 	LOG_INF("Websocket %d connected", ws_sock);
 
@@ -52,8 +52,7 @@ static void handleMessageReceive(void *inst, void *unused1, void *unused2)
 	while (1) {
 		// wait for connection to websocket before trying to receive messages from
 		// peripherals
-		k_event_wait(&ws_inst->_ws_evt_connected, CS_WEBSOCKET_CONNECTED_EVENT, false,
-			     K_FOREVER);
+		k_event_wait(&ws_inst->_ws_evts, CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
 
 		int ret, read_pos = 0, total_read = 0;
 		// receive data if available, don't block until it is
@@ -103,7 +102,7 @@ cs_ret_code_t WebSocket::connect(const char *url)
 		return CS_ERR_NOT_INITIALIZED;
 	}
 
-	k_event_init(&_ws_evt_connected);
+	k_event_init(&_ws_evts);
 
 	if (zsock_connect(_sock_id, &_addr, _addr_len) < 0) {
 		LOG_ERR("Failed to connect to socket host with errno: %d", -errno);
@@ -162,7 +161,7 @@ void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
 	}
 
 	// wait for connection to websocket before trying to receive messages from peripherals
-	k_event_wait(&ws_inst->_ws_evt_connected, CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
+	k_event_wait(&ws_inst->_ws_evts, CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
 
 	// a message is available, make sure it is sent over the websocket
 	int ret = websocket_send_msg(ws_inst->_websock_id, msg, msg_len, WEBSOCKET_OPCODE_DATA_TEXT,

@@ -16,6 +16,19 @@ LOG_MODULE_REGISTER(cs_ServiceUuid, LOG_LEVEL_ERR);
 #include <string.h>
 
 /**
+ * @brief Create ServiceUuid object from bt_uuid pointer.
+ */
+ServiceUuid::ServiceUuid(const bt_uuid *uuid)
+{
+	switch (uuid->type) {
+	case BT_UUID_TYPE_16:
+		_uuid.uuid_16 = *BT_UUID_16(uuid);
+	case BT_UUID_TYPE_128:
+		_uuid.uuid_128 = *BT_UUID_128(uuid);
+	}
+}
+
+/**
  * @brief Load a full UUID (128bit) in string representation.
  *  The UUID should be provided without dashes.
  *
@@ -36,6 +49,8 @@ cs_ret_code_t ServiceUuid::fromFullUuid(const char *fullUuid)
 			sizeof(uuid128_buf), ret);
 		return CS_ERR_INVALID_PARAM;
 	}
+
+	sys_mem_swap(uuid128_buf, sizeof(uuid128_buf));
 
 	if (!bt_uuid_create(&_uuid.uuid_128.uuid, uuid128_buf, sizeof(uuid128_buf))) {
 		LOG_ERR("%s", "Failed to create uuid struct from full uuid");
@@ -84,7 +99,7 @@ cs_ret_code_t ServiceUuid::fromBaseUuid(ServiceUuid *baseUuid, uint16_t shortUui
 {
 	fromFullUuid(&baseUuid->_uuid.uuid_128);
 	// our full UUID is reversed, so instead of byte 12 we put it at byte 2, reversed order
-	sys_put_be16(shortUuid, &_uuid.uuid_128.val[UUID_16_BASE_OFFSET]);
+	sys_put_le16(shortUuid, &_uuid.uuid_128.val[UUID_16_BASE_OFFSET]);
 
 	return CS_OK;
 }
@@ -100,7 +115,7 @@ cs_ble_uuid ServiceUuid::getUuid() const
 /**
  * @brief Compare ServiceUuid instances by == operator.
  */
-bool ServiceUuid::operator==(ServiceUuid *other)
+bool ServiceUuid::operator==(ServiceUuid other)
 {
-	return bt_uuid_cmp(&_uuid.uuid_128.uuid, &other->_uuid.uuid_128.uuid);
+	return bt_uuid_cmp(&_uuid.uuid_128.uuid, &other._uuid.uuid_128.uuid) ? 0 : 1;
 }

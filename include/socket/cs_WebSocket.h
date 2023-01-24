@@ -50,7 +50,7 @@ class WebSocket : public Socket
 	/** Structure containing websocket receive thread information */
 	k_thread _ws_tid;
 	/** Event structure used for an event when websocket is connected */
-	k_event _ws_evt_connected;
+	k_event _ws_evts;
 
 	/** Receive buffer of 256 bytes for storing data received from the websocket */
 	uint8_t _ws_recv_buf[CS_PACKET_BUF_SIZE];

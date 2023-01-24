@@ -13,7 +13,7 @@
 
 #include <stdint.h>
 
-#define UUID_16_BASE_OFFSET 2
+#define UUID_16_BASE_OFFSET 12
 
 union cs_ble_uuid {
 	bt_uuid_16 uuid_16;
@@ -28,6 +28,7 @@ class ServiceUuid
 	 * @brief Constructor for creating a ServiceUuid instance from a @ref cs_ble_uuid object.
 	 */
 	ServiceUuid(cs_ble_uuid uuid) : _uuid(uuid){};
+	ServiceUuid(const bt_uuid *uuid);
 
 	cs_ret_code_t fromFullUuid(const char *fullUuid);
 	cs_ret_code_t fromFullUuid(bt_uuid_128 *fullUuid);
@@ -36,7 +37,7 @@ class ServiceUuid
 
 	cs_ble_uuid getUuid() const;
 
-	bool operator==(ServiceUuid *other);
+	bool operator==(ServiceUuid other);
 
       private:
 	cs_ble_uuid _uuid;

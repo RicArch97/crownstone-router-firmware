@@ -18,8 +18,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CS_WIFI_SSID_FOUND_EVENT 0x001
-#define CS_WIFI_CONNECTED_EVENT	 0x001
+#define CS_WIFI_SSID_FOUND_EVENT 1
+#define CS_WIFI_CONNECTED_EVENT	 2
 // timeouts in ms
 #define CS_WIFI_SCAN_TIMEOUT	 5000
 #define CS_WIFI_CONNECT_TIMOUT	 10000
@@ -54,10 +54,8 @@ class Wifi
 	/** Structure with parameters for a wifi connect request */
 	wifi_connect_req_params _cnx_params = {0};
 
-	/** Event structure used for an event when wifi network is found */
-	k_event _wifi_evt_ssid_found;
-	/** Event structure used for an event when connection is established */
-	k_event _wifi_evt_connected;
+	/** Event structure used for wifi events */
+	k_event _wifi_evts;
 
 	/** Flag used to indicate that a disconnection has been requested */
 	bool _disconnecting = false;

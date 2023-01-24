@@ -24,7 +24,7 @@
 #define CS_UART_RS_BAUD_DEFAULT 9600
 
 #define CS_UART_BUFFER_SIZE	  256
-#define CS_UART_BUFFER_QUEUE_SIZE 5
+#define CS_UART_BUFFER_QUEUE_SIZE 3
 
 #define CS_UART_THREAD_PRIORITY	  K_PRIO_PREEMPT(7)
 #define CS_UART_THREAD_STACK_SIZE 4096
@@ -78,7 +78,7 @@ class Uart
 	PacketHandler *_pkt_handler = NULL;
 
 	/** UART message queue structure instance */
-	k_msgq _msgq_uart_msgs;
+	k_msgq _uart_msgq;
 	/** UART message buffer used by the message queue */
 	char __aligned(4) _msgq_buf[CS_UART_BUFFER_QUEUE_SIZE * CS_UART_BUFFER_SIZE];
 

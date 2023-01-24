@@ -7,7 +7,7 @@
 
 #include "drivers/cs_Uart.h"
 #include "drivers/cs_Wifi.h"
-#include "drivers/ble/cs_BleCentral.h"
+#include "drivers/ble/cs_CrownstoneCentral.h"
 #include "socket/cs_WebSocket.h"
 #include "cs_ReturnTypes.h"
 #include "cs_PacketHandling.h"
@@ -42,7 +42,7 @@ int main(void)
 	}
 
 	// wait till wifi connection is established before creating websocket
-	k_event_wait(&wifi->_wifi_evt_connected, CS_WIFI_CONNECTED_EVENT, true, K_FOREVER);
+	k_event_wait(&wifi->_wifi_evts, CS_WIFI_CONNECTED_EVENT, true, K_FOREVER);
 
 	PacketHandler pkt_handler;
 	pkt_handler.init();
@@ -66,11 +66,11 @@ int main(void)
 		LOG_INF("%s", "RS485 initialized");
 	}
 
-	BleCentral *ble = &BleCentral::getInstance();
-	if (ble->init() == CS_OK) {
-		LOG_INF("%s", "BLE central initialized");
+	CrownstoneCentral *crwn = &CrownstoneCentral::getInstance();
+	if (crwn->init() == CS_OK) {
+		LOG_INF("%s", "Crownstone central initialized");
 		// connect to given (currently hardcoded) MAC address
-		ble->connect(CROWNSTONE_MAC);
+		crwn->connect(CROWNSTONE_MAC);
 	}
 
 	LOG_INF("%s", "Crownstone router initialized");

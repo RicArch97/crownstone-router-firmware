@@ -29,7 +29,7 @@ static void handleUartMessages(void *inst, void *unused1, void *unused2)
 
 	while (1) {
 		// wait till message is retrieved from message queue
-		if (k_msgq_get(&uart_inst->_msgq_uart_msgs, &msg_buf, K_FOREVER) == 0) {
+		if (k_msgq_get(&uart_inst->_uart_msgq, &msg_buf, K_FOREVER) == 0) {
 			LOG_HEXDUMP_DBG(msg_buf, (uint32_t)strlen((char *)msg_buf), "uart message");
 
 			// packets sent from CM4 start with a specific token, handle the packet
@@ -76,9 +76,9 @@ static void handleUartInterrupt(const device *dev, void *user_data)
 
 				// add to message queue, this copies the data to ring buffer
 				// if queue is full, purge old data and try again
-				if (k_msgq_put(&uart_inst->_msgq_uart_msgs, &uart_inst->_uart_buf,
+				if (k_msgq_put(&uart_inst->_uart_msgq, &uart_inst->_uart_buf,
 					       K_NO_WAIT) != 0) {
-					k_msgq_purge(&uart_inst->_msgq_uart_msgs);
+					k_msgq_purge(&uart_inst->_uart_msgq);
 				}
 
 				uart_inst->_uart_buf_ctr = 0;
@@ -171,7 +171,7 @@ cs_ret_code_t Uart::init(cs_uart_config *cfg)
 	}
 
 	// initialize message queue, aligned to 4-byte boundary
-	k_msgq_init(&_msgq_uart_msgs, _msgq_buf, CS_UART_BUFFER_SIZE, CS_UART_BUFFER_QUEUE_SIZE);
+	k_msgq_init(&_uart_msgq, _msgq_buf, CS_UART_BUFFER_SIZE, CS_UART_BUFFER_QUEUE_SIZE);
 
 	// set ISR, pass pointer to this class object as user data
 	uart_irq_callback_user_data_set(_uart_dev, handleUartInterrupt, this);
@@ -227,5 +227,5 @@ void Uart::disable()
  */
 Uart::~Uart()
 {
-	k_msgq_cleanup(&_msgq_uart_msgs);
+	k_msgq_cleanup(&_uart_msgq);
 }
