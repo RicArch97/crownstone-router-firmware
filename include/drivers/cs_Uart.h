@@ -8,7 +8,7 @@
 #pragma once
 
 #include "cs_ReturnTypes.h"
-#include "cs_Router.h"
+#include "cs_RouterProtocol.h"
 #include "cs_PacketHandling.h"
 
 #include <zephyr/device.h>
@@ -71,9 +71,9 @@ class Uart
 	const device *_uart_dev = NULL;
 
 	/** Destination id, where UART packets from this instance should be routed to */
-	cs_router_instance_id _dest_id;
+	cs_router_instance_id _dest_id = CS_INSTANCE_ID_UNKNOWN;
 	/** UART source id, identifying the UART device from which data is sent */
-	cs_router_instance_id _src_id;
+	cs_router_instance_id _src_id = CS_INSTANCE_ID_UNKNOWN;
 	/** PacketHanler instance to handle messages and packets */
 	PacketHandler *_pkt_handler = NULL;
 

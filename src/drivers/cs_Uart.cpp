@@ -32,14 +32,28 @@ static void handleUartMessages(void *inst, void *unused1, void *unused2)
 		if (k_msgq_get(&uart_inst->_uart_msgq, &msg_buf, K_FOREVER) == 0) {
 			LOG_HEXDUMP_DBG(msg_buf, (uint32_t)strlen((char *)msg_buf), "uart message");
 
-			// packets sent from CM4 start with a specific token, handle the packet
+			cs_packet_data uart_data;
+			uart_data.buffer = msg_buf;
+			// UART buffers are null terminated, so get length with strlen
+			uart_data.buffer_len = strlen((char *)msg_buf);
+			uart_data.dest_id = uart_inst->_dest_id;
+
+			// packets sent from CM4 start with a specific token
+			// handle the packet as incoming
 			if (msg_buf[0] == CS_PACKET_UART_START_TOKEN) {
-				uart_inst->_pkt_handler->handleIncomingPacket(msg_buf, true);
+				uart_data.src_id = CS_INSTANCE_ID_UART_CM4;
+				uart_data.type = CS_DATA_INCOMING;
 			} else {
-				// UART buffers are null terminated, so get length with strlen
-				uart_inst->_pkt_handler->handlePeripheralData(
-					uart_inst->_src_id, uart_inst->_dest_id, msg_buf,
-					strlen((char *)msg_buf));
+				// packet is sent from this instance, use own source id
+				uart_data.src_id = uart_inst->_src_id;
+				uart_data.type = CS_DATA_OUTGOING;
+			}
+
+			if (uart_inst->_pkt_handler != NULL) {
+				// struct is copied into the work queue handle
+				uart_inst->_pkt_handler->handlePacket(&uart_data);
+			} else {
+				LOG_WRN("%s", "Failed to handle UART message");
 			}
 		}
 	}

@@ -73,6 +73,7 @@ enum cs_router_generic_packet_type : uint8_t {
  * @param command_type Type of the command
  * @param src_id The id of the source device, used to send result packet back
  * @param dest_id The id of the destination device that should receive this command
+ * @param request_id Request ID of the command, to be included in the result
  * @param length Length of the payload
  * @param payload Payload according to the command type, depends on length
  */
@@ -80,6 +81,7 @@ struct cs_router_control_packet {
 	uint8_t command_type;
 	uint8_t src_id;
 	uint8_t dest_id;
+	uint16_t request_id;
 	uint16_t length;
 	uint8_t *payload;
 } __packed;
@@ -89,12 +91,14 @@ struct cs_router_control_packet {
  *
  * @param command_type Type of the command of which this packet is the result
  * @param result_code The result code
+ * @param result_id Result ID of the command, so the correct result can be awaited
  * @param length Length of the payload
  * @param payload Payload according to the command type, depends on length
  */
 struct cs_router_result_packet {
 	uint8_t command_type;
 	uint8_t result_code;
+	uint16_t request_id;
 	uint16_t length;
 	uint8_t *payload;
 } __packed;
@@ -122,7 +126,8 @@ enum cs_router_command_type : uint8_t {
 	CS_COMMAND_TYPE_WIFI_DISCONNECT,
 	CS_COMMAND_TYPE_RESET,
 	CS_COMMAND_TYPE_FACTORY_RESET,
-	CS_COMMAND_TYPE_SWITCH
+	CS_COMMAND_TYPE_SWITCH,
+	CS_COMMAND_TYPE_REQUEST
 };
 
 /**
@@ -150,14 +155,14 @@ enum cs_router_result_code : uint8_t {
  * @brief Instance ids.
  */
 enum cs_router_instance_id : uint8_t {
-	CS_INSTANCE_ID_ESP32, // the controller where this firmware runs, for configuration commands
+	CS_INSTANCE_ID_UNKNOWN,
+	CS_INSTANCE_ID_ESP32,	   // the controller where this firmware runs
 	CS_INSTANCE_ID_UART_RS485, // e.g. solar panel / heatpump / charging station
 	CS_INSTANCE_ID_UART_RS232, // e.g. dutch smart meter
 	CS_INSTANCE_ID_UART_CM4,   // raspberry pi computer module 4 where application code runs
 	CS_INSTANCE_ID_CLOUD,	   // cloud server where application code runs
-	CS_INSTANCE_ID_BLE_CROWNSTONE_MESH,   // crownstone's BLE mesh
-	CS_INSTANCE_ID_BLE_CROWNSTONE_CLIENT, // 1 to 1 BLE connection to a crownstone
-	CS_INSTANCE_ID_AMOUNT		      // amount of instance id's available
+	CS_INSTANCE_ID_BLE_CROWNSTONE_MESH,	  // crownstone's BLE mesh
+	CS_INSTANCE_ID_BLE_CROWNSTONE_PERIPHERAL, // Central to peripheral BLE connection
 };
 
 /**
@@ -249,13 +254,3 @@ enum cs_router_get_config_persistence_mode : uint8_t {
 	CS_GET_CONFIG_PERSISTENCE_MODE_STORED,
 	CS_GET_CONFIG_PERSISTENCE_MODE_FIRMWARE_DEFAULT
 };
-
-/**
- * @brief Frame struct for a switch command packet.
- *
- * @param switch_value Value from 0 to 100, can be analog to support dimming.
- * when using digital, 0 means off and 100 means on.
- */
-struct cs_router_switch_command_packet {
-	uint8_t switch_value;
-} __packed;

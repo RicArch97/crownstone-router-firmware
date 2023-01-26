@@ -28,7 +28,7 @@ static void handleWifiScanResult(net_mgmt_event_callback *cb)
 	const wifi_scan_result *entry = (const wifi_scan_result *)cb->info;
 
 	// get singleton instance
-	Wifi *wifi_inst = &Wifi::getInstance();
+	Wifi *wifi_inst = Wifi::getInstance();
 
 	if (memcmp(wifi_inst->_ssid, entry->ssid, wifi_inst->_ssid_len) == 0) {
 		wifi_inst->_cnx_params.security = entry->security;
@@ -49,7 +49,7 @@ static void handleWifiConnectionResult(net_mgmt_event_callback *cb)
 	const wifi_status *status = (const wifi_status *)cb->info;
 
 	// get singleton instance
-	Wifi *wifi_inst = &Wifi::getInstance();
+	Wifi *wifi_inst = Wifi::getInstance();
 
 	if (status->status) {
 		LOG_ERR("Connection request failed (%d)", status->status);
@@ -67,7 +67,7 @@ static void handleWifiDisconnectionResult(net_mgmt_event_callback *cb)
 	const wifi_status *status = (const wifi_status *)cb->info;
 
 	// get singleton instance
-	Wifi *wifi_inst = &Wifi::getInstance();
+	Wifi *wifi_inst = Wifi::getInstance();
 
 	if (wifi_inst->_disconnecting) {
 		if (status->status) {
@@ -189,6 +189,29 @@ cs_ret_code_t Wifi::connect()
 		     sizeof(wifi_connect_req_params)) != 0) {
 		LOG_ERR("%s", "Wifi connect request failed");
 	}
+
+	return CS_OK;
+}
+
+/**
+ * @brief Wait till a Wifi connection has been established.
+ *
+ * @param timeout_ms How long to wait before giving up.
+ *
+ * @return CS_OK if the events were received within the given time.
+ */
+cs_ret_code_t Wifi::waitConnected(uint16_t timeout_ms)
+{
+	k_timeout_t tout = K_FOREVER;
+
+	if (timeout_ms != SYS_FOREVER_MS) {
+		tout = K_MSEC(timeout_ms);
+	}
+
+	if (k_event_wait(&_wifi_evts, CS_WIFI_CONNECTED_EVENT, false, tout) == 0) {
+		LOG_ERR("%s", "Timeout one waiting for Wifi connection");
+		return CS_ERR_TIMEOUT;
+	};
 
 	return CS_OK;
 }

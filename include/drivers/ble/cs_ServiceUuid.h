@@ -35,7 +35,7 @@ class ServiceUuid
 	cs_ret_code_t fromShortUuid(uint16_t shortUuid);
 	cs_ret_code_t fromBaseUuid(ServiceUuid *baseUuid, uint16_t shortUuid);
 
-	cs_ble_uuid getUuid() const;
+	cs_ble_uuid *getUuid();
 
 	bool operator==(ServiceUuid other);
 

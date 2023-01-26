@@ -20,7 +20,7 @@
 #define CS_WEBSOCKET_THREAD_STACK_SIZE 4096
 
 #define CS_WEBSOCKET_HTTP_HEADER_SIZE  30
-#define CS_WEBSOCKET_RECV_RETRY_TIMOUT 100
+#define CS_WEBSOCKET_RECV_RETRY_TIMOUT 50
 #define CS_WEBSOCKET_URL_MAX_LEN       32
 
 #define CS_WEBSOCKET_CONNECTED_EVENT 0x001
@@ -32,9 +32,11 @@ class WebSocket : public Socket
 	/**
 	 * @brief WebSocket constructor for data packaging and handling.
 	 *
+	 * @param src_id Identifier for the websocket, used for incoming packets
 	 * @param handler PacketHandler instance
 	 */
-	WebSocket(PacketHandler *handler) : _pkt_handler(handler){};
+	WebSocket(cs_router_instance_id src_id, PacketHandler *handler)
+		: _src_id(src_id), _pkt_handler(handler){};
 
 	cs_ret_code_t connect(const char *url);
 	cs_ret_code_t close();
@@ -44,6 +46,8 @@ class WebSocket : public Socket
 	/** ID of the websocket */
 	int _websock_id = -1;
 
+	/** Websocket source id, to identify as incoming data handler */
+	cs_router_instance_id _src_id = CS_INSTANCE_ID_UNKNOWN;
 	/** PacketHanler instance to handle packets */
 	PacketHandler *_pkt_handler = NULL;
 

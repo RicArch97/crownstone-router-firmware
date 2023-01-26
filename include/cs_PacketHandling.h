@@ -7,13 +7,16 @@
 
 #pragma once
 
-#include "cs_Router.h"
+#include "cs_RouterProtocol.h"
 #include "cs_ReturnTypes.h"
 
 #include <zephyr/kernel.h>
 
 #include <stdint.h>
 #include <stdbool.h>
+
+#define CS_PACKET_HANDLERS_INPUT  2
+#define CS_PACKET_HANDLERS_OUTPUT 7
 
 #define CS_PACKET_BUF_SIZE 256
 
@@ -22,41 +25,74 @@
 
 typedef void (*cs_packet_transport_cb_t)(void *inst, uint8_t *msg, int msg_len);
 
-struct cs_packet_handler {
-	cs_router_instance_id id;
-	void *inst;
+enum cs_packet_transport_type {
+	CS_DATA_INCOMING,
+	CS_DATA_OUTGOING
+};
+
+struct cs_packet_data {
+	cs_packet_transport_type type;
+	cs_router_instance_id dest_id;
+	cs_router_instance_id src_id;
+	cs_router_result_code result_code;
+	uint8_t *buffer;
+	uint16_t buffer_len;
+};
+
+struct cs_packet_handler_input {
+	k_work work_item;
+	k_sem work_sem;
+	cs_router_instance_id source_id;
+	uint8_t buffer[CS_PACKET_BUF_SIZE];
+	void *ph_inst;
+};
+
+struct cs_packet_handler_output {
+	k_work work_item;
+	k_sem work_sem;
+	cs_router_instance_id target_id;
+	cs_router_instance_id source_id;
+	cs_router_result_code result_code;
+	void *target_inst;
 	cs_packet_transport_cb_t cb;
+	uint8_t buffer[CS_PACKET_BUF_SIZE];
+	uint16_t buffer_len;
+	uint16_t result_id;
 };
 
 class PacketHandler
 {
       public:
-	void init();
-	void registerTransportHandler(cs_router_instance_id inst_id, void *inst,
-				      cs_packet_transport_cb_t cb);
-	void unregisterTransportHandler(cs_router_instance_id inst_id);
-	void handleIncomingPacket(uint8_t *buffer, bool is_uart_pkt);
-	void handlePeripheralData(cs_router_instance_id src_id, cs_router_instance_id dest_id,
-				  uint8_t *buffer, int buffer_len);
+	cs_ret_code_t init();
+	cs_ret_code_t registerInputHandler(cs_router_instance_id inst_id);
+	cs_ret_code_t registerOutputHandler(cs_router_instance_id inst_id, void *inst,
+					    cs_packet_transport_cb_t cb);
+	cs_ret_code_t unregisterHandler(cs_packet_transport_type type,
+					cs_router_instance_id inst_id);
+	cs_packet_handler_output *getOutputHandler(cs_router_instance_id inst_id);
+	cs_ret_code_t handlePacket(cs_packet_data *data);
 
       private:
-	void transportPacket(cs_router_instance_id inst_id, uint8_t *buffer, int buffer_len);
+	/** Initialized flag */
+	bool _initialized = false;
 
-	int wrapUartPacket(uint8_t type, uint8_t *payload, int payload_len, uint8_t *pkt_buf);
-	int wrapGenericPacket(uint8_t type, uint8_t *payload, int payload_len, uint8_t *pkt_buf);
-	int wrapDataPacket(uint8_t src_id, uint8_t *payload, int payload_len, uint8_t *pkt_buf);
+	/**
+	 * Register of handlers for incoming packets
+	 * This amount is 2: UART CM4 and websocket
+	 */
+	cs_packet_handler_input _in_handlers[CS_PACKET_HANDLERS_INPUT];
+	/**
+	 * Register of handlers for outgoing packets
+	 * This amount is 7: UART RS485/RS232/CM4, websocket, BLE mesh/peripheral
+	 */
+	cs_packet_handler_output _out_handlers[CS_PACKET_HANDLERS_OUTPUT];
 
-	void loadUartPacket(cs_router_uart_packet *uart_pkt, uint8_t *buffer);
-	void loadGenericPacket(cs_router_generic_packet *generic_pkt, uint8_t *buffer);
-	void loadControlPacket(cs_router_control_packet *ctrl_pkt, uint8_t *buffer);
-	void loadSwitchCommandPacket(cs_router_switch_command_packet *switch_pkt, uint8_t *buffer);
+	/** Mutexes to protect handlers */
+	k_mutex _out_pkth_mtx;
+	k_mutex _in_pkth_mtx;
 
-	/** Register of callbacks for handling message buffer for instances */
-	cs_packet_handler _handlers[CS_INSTANCE_ID_AMOUNT];
-
-	/** Mutex to protect handlers */
-	k_mutex _pkth_mtx;
-
-	/** Amount of callbacks currently registered */
-	int _handler_ctr = 0;
+	/** Amount of outgoing handlers currently registered */
+	int _in_handler_ctr = 0;
+	/** Amount of outgoing handlers currently registered */
+	int _out_handler_ctr = 0;
 };

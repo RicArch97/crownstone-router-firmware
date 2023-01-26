@@ -62,6 +62,7 @@ static void handleMessageReceive(void *inst, void *unused1, void *unused2)
 						 (sizeof(ws_inst->_ws_recv_buf) - read_pos),
 						 &message_type, &remaining_bytes, 0);
 			// there is still data available, try receiving the rest
+			// or: there is no data available, wait for 50ms and reschedule
 			if (ret < 0) {
 				if (ret == -EAGAIN) {
 					k_msleep(CS_WEBSOCKET_RECV_RETRY_TIMOUT);
@@ -77,8 +78,16 @@ static void handleMessageReceive(void *inst, void *unused1, void *unused2)
 
 		LOG_DBG("Received %d bytes", total_read);
 
+		// this struct is copied into the work handler
+		cs_packet_data ws_data;
+		ws_data.type = CS_DATA_INCOMING;
+		ws_data.src_id = ws_inst->_src_id;
+		ws_data.buffer = ws_inst->_ws_recv_buf;
+		ws_data.buffer_len = total_read;
+
 		if (ws_inst->_pkt_handler != NULL) {
-			ws_inst->_pkt_handler->handleIncomingPacket(ws_inst->_ws_recv_buf, false);
+			// dispatch the work item
+			ws_inst->_pkt_handler->handlePacket(&ws_data);
 		} else {
 			LOG_WRN("%s", "Failed to handle websocket packet");
 		}

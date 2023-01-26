@@ -107,9 +107,9 @@ cs_ret_code_t ServiceUuid::fromBaseUuid(ServiceUuid *baseUuid, uint16_t shortUui
 /**
  * @brief Get UUID. Can be either bt_uuid_16 or bt_uuid_128.
  */
-cs_ble_uuid ServiceUuid::getUuid() const
+cs_ble_uuid *ServiceUuid::getUuid()
 {
-	return _uuid;
+	return &_uuid;
 }
 
 /**

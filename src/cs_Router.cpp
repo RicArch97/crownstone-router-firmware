@@ -7,11 +7,11 @@
 
 #include "drivers/cs_Uart.h"
 #include "drivers/cs_Wifi.h"
-#include "drivers/ble/cs_CrownstoneCentral.h"
+#include "drivers/ble/cs_BleCentral.h"
 #include "socket/cs_WebSocket.h"
 #include "cs_ReturnTypes.h"
 #include "cs_PacketHandling.h"
-#include "cs_Router.h"
+#include "cs_RouterProtocol.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
@@ -26,56 +26,53 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 #define HOST_ADDR "addr"
 #define HOST_PORT 14500
 
-#define CROWNSTONE_MAC "mac"
+#define CROWNSTONE_MAC	"F7:19:A4:EF:EA:F6"
+#define CROWNSTONE_UUID "24f000007d104805bfc17663a01c3bff"
 
 int main(void)
 {
-	Wifi *wifi = &Wifi::getInstance();
+	cs_ret_code_t ret = CS_OK;
+
+	PacketHandler pkt_handler;
+	ret |= pkt_handler.init();
+
+	Wifi *wifi = Wifi::getInstance();
 	if (wifi->init(TEST_SSID, TEST_PSK) == CS_OK) {
-		LOG_INF("%s", "Wifi initialized");
-		// retry if scan result did not contain our SSID
 		int conn_ret = CS_OK;
 		do {
 			conn_ret = wifi->connect();
 		} while (conn_ret == CS_ERR_WIFI_SCAN_RESULT_TIMEOUT);
-		LOG_INF("%s", "Wifi connection request done");
 	}
 
 	// wait till wifi connection is established before creating websocket
-	k_event_wait(&wifi->_wifi_evts, CS_WIFI_CONNECTED_EVENT, true, K_FOREVER);
+	ret |= wifi->waitConnected(SYS_FOREVER_MS);
 
-	PacketHandler pkt_handler;
-	pkt_handler.init();
+	WebSocket web_socket(CS_INSTANCE_ID_CLOUD, &pkt_handler);
+	ret |= web_socket.init(HOST_ADDR, CS_SOCKET_IPV4, HOST_PORT);
+	ret |= pkt_handler.registerInputHandler(CS_INSTANCE_ID_CLOUD);
+	ret |= pkt_handler.registerOutputHandler(CS_INSTANCE_ID_CLOUD, &web_socket,
+						 WebSocket::sendMessage);
+	ret |= web_socket.connect(NULL);
+
+	BleCentral *ble = BleCentral::getInstance();
+	ble->setSourceId(CS_INSTANCE_ID_BLE_CROWNSTONE_PERIPHERAL);
+	ble->setDestinationId(CS_INSTANCE_ID_CLOUD);
+	ret |= ble->init(CROWNSTONE_UUID, &pkt_handler);
 
 	const device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
 	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485, CS_INSTANCE_ID_CLOUD, &pkt_handler);
-	WebSocket web_socket(&pkt_handler);
+	ret |= rs485.init(NULL);
+	ret |= pkt_handler.registerOutputHandler(CS_INSTANCE_ID_UART_RS485, &rs485,
+						 Uart::sendUartMessage);
 
-	// register instances with transport callbacks
-	pkt_handler.registerTransportHandler(CS_INSTANCE_ID_UART_RS485, &rs485,
-					     Uart::sendUartMessage);
-	pkt_handler.registerTransportHandler(CS_INSTANCE_ID_CLOUD, &web_socket,
-					     WebSocket::sendMessage);
-
-	if (web_socket.init(HOST_ADDR, CS_SOCKET_IPV4, HOST_PORT) == CS_OK) {
-		LOG_INF("%s", "Websocket initialized");
-		web_socket.connect(NULL);
-	}
-
-	if (rs485.init(NULL) == CS_OK) {
-		LOG_INF("%s", "RS485 initialized");
-	}
-
-	CrownstoneCentral *crwn = &CrownstoneCentral::getInstance();
-	if (crwn->init() == CS_OK) {
-		LOG_INF("%s", "Crownstone central initialized");
-		// connect to given (currently hardcoded) MAC address
-		crwn->connect(CROWNSTONE_MAC);
+	if (ret) {
+		LOG_ERR("Failed to initialize router (err %d)", ret);
+		return EXIT_FAILURE;
 	}
 
 	LOG_INF("%s", "Crownstone router initialized");
 
 	k_sleep(K_FOREVER);
 
-	return 0;
+	return EXIT_SUCCESS;
 }

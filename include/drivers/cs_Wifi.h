@@ -27,10 +27,10 @@
 class Wifi
 {
       public:
-	static Wifi &getInstance()
+	static Wifi *getInstance()
 	{
 		static Wifi instance;
-		return instance;
+		return &instance;
 	}
 	// Deny implementation
 	Wifi(Wifi const &) = delete;
@@ -40,6 +40,7 @@ class Wifi
 
 	cs_ret_code_t init(const char *ssid, const char *psk);
 	cs_ret_code_t connect();
+	cs_ret_code_t waitConnected(uint16_t timeout_ms);
 	cs_ret_code_t disconnect();
 
 	/** SSID buffer, max 32 bytes (characters) */
