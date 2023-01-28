@@ -46,90 +46,96 @@ static uint8_t handleDiscoveryResults(bt_conn *conn, const bt_gatt_attr *attr,
 				      bt_gatt_discover_params *params)
 {
 	BleCentral *ble_inst = BleCentral::getInstance();
-	// there are no more results left
-	if (!attr) {
-		return BT_GATT_ITER_STOP;
-	}
 
 	if (params->type == BT_GATT_DISCOVER_PRIMARY) {
-		bt_gatt_service_val *srv_val = static_cast<bt_gatt_service_val *>(attr->user_data);
-
-		ServiceUuid found_uuid(srv_val->uuid);
-		if (found_uuid == ble_inst->_uuid_base) {
-			LOG_DBG("%s", "Discovered primary service");
-
+		if (attr == NULL) {
 			// look for all characteristics for our service
 			ble_inst->_gatt_discover_params.uuid = NULL;
-			ble_inst->_gatt_discover_params.start_handle = attr->handle + 1;
 			ble_inst->_gatt_discover_params.type = BT_GATT_DISCOVER_CHARACTERISTIC;
+			ble_inst->_gatt_discover_params.start_handle = ble_inst->_next_handle;
 
 			int ret = bt_gatt_discover(conn, &ble_inst->_gatt_discover_params);
 			if (ret) {
 				LOG_ERR("Failed to start GATT discovery (err %d)", ret);
-				return BT_GATT_ITER_STOP;
+			}
+		} else {
+			bt_gatt_service_val *srv_val =
+				static_cast<bt_gatt_service_val *>(attr->user_data);
+
+			ServiceUuid found_uuid(srv_val->uuid);
+			if (found_uuid == ble_inst->_uuid_base) {
+				ble_inst->_next_handle = attr->handle + 1;
+				LOG_DBG("%s", "Discovered primary service");
 			}
 		}
 	} else if (params->type == BT_GATT_DISCOVER_CHARACTERISTIC) {
-		bt_gatt_chrc *chrc = static_cast<bt_gatt_chrc *>(attr->user_data);
-
-		ServiceUuid found_uuid(chrc->uuid);
-		ServiceUuid session_uuid, ctrl_uuid, result_uuid;
-
-		session_uuid.fromBaseUuid(&ble_inst->_uuid_base, SESSION_DATA_UUID);
-		ctrl_uuid.fromBaseUuid(&ble_inst->_uuid_base, CONTROL_UUID);
-		result_uuid.fromBaseUuid(&ble_inst->_uuid_base, RESULT_UUID);
-
-		if (found_uuid == session_uuid) {
-			ble_inst->_chrc_handle_count++;
-			ble_inst->_sessionDataHandle = chrc->value_handle;
-			LOG_DBG("Discovered Crownstone session data handle: %u",
-				ble_inst->_sessionDataHandle);
-		}
-		if (found_uuid == ctrl_uuid) {
-			ble_inst->_chrc_handle_count++;
-			ble_inst->_controlHandle = chrc->value_handle;
-			LOG_DBG("Discovered Crownstone control handle: %u",
-				ble_inst->_controlHandle);
-		}
-		if (found_uuid == result_uuid) {
-			ble_inst->_chrc_handle_count++;
-			ble_inst->_resultHandle = chrc->value_handle;
-			// we only need one CCC handle, set end handle accordingly
-			ble_inst->_gatt_discover_params.start_handle = attr->handle + 1;
-			ble_inst->_gatt_discover_params.end_handle = attr->handle + 2;
-			ble_inst->_gatt_subscribe_params.value_handle = chrc->value_handle;
-			LOG_DBG("Discovered Crownstone result handle: %u", ble_inst->_resultHandle);
-		}
-
-		// we check 3 UUIDs
-		if (ble_inst->_chrc_handle_count >= 3) {
+		if (attr == NULL) {
 			// look for the CCC of the result characteristic
 			ble_inst->_gatt_discover_params.uuid =
 				&ble_inst->_uuid_ccc.getUuid()->uuid_16.uuid;
 			ble_inst->_gatt_discover_params.type = BT_GATT_DISCOVER_DESCRIPTOR;
+			ble_inst->_gatt_discover_params.start_handle = ble_inst->_next_handle;
+			// only one descriptor
+			ble_inst->_gatt_discover_params.end_handle = ble_inst->_next_handle + 1;
 
 			int ret = bt_gatt_discover(conn, &ble_inst->_gatt_discover_params);
 			if (ret) {
 				LOG_ERR("Failed to start GATT discovery (err %d)", ret);
-				return BT_GATT_ITER_STOP;
+			}
+		} else {
+			bt_gatt_chrc *chrc = static_cast<bt_gatt_chrc *>(attr->user_data);
+
+			char uuid_str[BT_UUID_STR_LEN];
+			bt_uuid_to_str(chrc->uuid, uuid_str, sizeof(uuid_str));
+			LOG_DBG("Discovered UUID: %s", uuid_str);
+
+			ServiceUuid found_uuid(chrc->uuid);
+			ServiceUuid session_uuid, ctrl_uuid, result_uuid;
+
+			session_uuid.fromBaseUuid(&ble_inst->_uuid_base, SESSION_DATA_UUID);
+			ctrl_uuid.fromBaseUuid(&ble_inst->_uuid_base, CONTROL_UUID);
+			result_uuid.fromBaseUuid(&ble_inst->_uuid_base, RESULT_UUID);
+
+			if (found_uuid == session_uuid) {
+				ble_inst->_sessionDataHandle = chrc->value_handle;
+				LOG_DBG("Discovered Crownstone session data handle: %u",
+					ble_inst->_sessionDataHandle);
+			}
+			if (found_uuid == ctrl_uuid) {
+				ble_inst->_controlHandle = chrc->value_handle;
+				LOG_DBG("Discovered Crownstone control handle: %u",
+					ble_inst->_controlHandle);
+			}
+			if (found_uuid == result_uuid) {
+				ble_inst->_resultHandle = chrc->value_handle;
+				// we at this point we can still discover more characteristics
+				ble_inst->_next_handle = attr->handle + 1;
+				ble_inst->_gatt_subscribe_params.value_handle = chrc->value_handle;
+				LOG_DBG("Discovered Crownstone result handle: %u",
+					ble_inst->_resultHandle);
 			}
 		}
 	} else {
-		ble_inst->_gatt_subscribe_params.notify = handleNotifications;
-		ble_inst->_gatt_subscribe_params.subscribe = handleDiscoveryDone;
-		ble_inst->_gatt_subscribe_params.value = BT_GATT_CCC_NOTIFY;
-		ble_inst->_gatt_subscribe_params.ccc_handle = attr->handle;
-
-		int ret = bt_gatt_subscribe(conn, &ble_inst->_gatt_subscribe_params);
-		if (ret && ret != -EALREADY) {
-			LOG_ERR("Subscribe failed (err %d)", ret);
+		// no more results
+		if (attr == NULL) {
+			return BT_GATT_ITER_STOP;
 		} else {
-			LOG_DBG("Subscribed to handle: %hu",
-				ble_inst->_gatt_subscribe_params.value_handle);
-		}
-		LOG_INF("%s", "Discovery completed.");
+			ble_inst->_gatt_subscribe_params.notify = handleNotifications;
+			ble_inst->_gatt_subscribe_params.subscribe = handleDiscoveryDone;
+			ble_inst->_gatt_subscribe_params.value = BT_GATT_CCC_NOTIFY;
+			ble_inst->_gatt_subscribe_params.ccc_handle = attr->handle;
 
-		return BT_GATT_ITER_STOP;
+			int ret = bt_gatt_subscribe(conn, &ble_inst->_gatt_subscribe_params);
+			if (ret && ret != -EALREADY) {
+				LOG_ERR("Subscribe failed (err %d)", ret);
+			} else {
+				LOG_DBG("Subscribed to handle: %hu",
+					ble_inst->_gatt_subscribe_params.value_handle);
+			}
+			LOG_INF("%s", "Discovery completed.");
+
+			return BT_GATT_ITER_STOP;
+		}
 	}
 	return BT_GATT_ITER_CONTINUE;
 }
@@ -161,12 +167,16 @@ static uint8_t handleReadResult(bt_conn *conn, uint8_t err, bt_gatt_read_params 
 	BleCentral *ble_inst = BleCentral::getInstance();
 
 	if (!data) {
+		LOG_HEXDUMP_DBG(ble_inst->_ble_buf, ble_inst->_ble_buf_ctr, "BLE read");
+
 		cs_packet_data ble_read_data;
+		memset(&ble_read_data, 0, sizeof(ble_read_data));
+		ble_read_data.msg_len = ble_inst->_ble_buf_ctr;
 		ble_read_data.src_id = ble_inst->_src_id;
 		ble_read_data.dest_id = ble_inst->_dest_id;
-		ble_read_data.buffer_len = ble_inst->_ble_buf_ctr;
 		ble_read_data.type = CS_DATA_OUTGOING;
-		memcpy(ble_read_data.buffer, ble_inst->_ble_buf, ble_inst->_ble_buf_ctr);
+		ble_read_data.result_code = CS_RESULT_TYPE_SUCCES;
+		memcpy(&ble_read_data.msg, ble_inst->_ble_buf, ble_inst->_ble_buf_ctr);
 
 		if (ble_inst->_pkt_handler != NULL) {
 			// data is copied into work handler, so we don't have to save the struct
@@ -175,6 +185,7 @@ static uint8_t handleReadResult(bt_conn *conn, uint8_t err, bt_gatt_read_params 
 			LOG_WRN("%s", "Failed to handle BLE message");
 		}
 
+		ble_inst->_ble_buf_ctr = 0;
 		LOG_DBG("%s", "Read completed.");
 		return BT_GATT_ITER_STOP;
 	}
@@ -358,8 +369,8 @@ cs_ret_code_t BleCentral::init(const char *base_uuid, PacketHandler *pkt_handler
 	_conn_create_params.window = BT_GAP_SCAN_FAST_WINDOW;
 
 	memset(&_conn_init_params, 0, sizeof(_conn_init_params));
-	_conn_init_params.interval_max = BT_GAP_INIT_CONN_INT_MAX;
-	_conn_init_params.interval_min = BT_GAP_INIT_CONN_INT_MIN;
+	_conn_init_params.interval_max = 0x20;
+	_conn_init_params.interval_min = 0x06;
 	_conn_init_params.timeout = CS_BLE_CENTRAL_CONN_TIMEOUT; // 4 s
 
 	memset(&_conn_cbs, 0, sizeof(_conn_cbs));
@@ -406,7 +417,7 @@ cs_ret_code_t BleCentral::connect(const char *device_addr)
 	bt_addr_le_from_str(device_addr, CS_BLE_CENTRAL_ADDR_TYPE_RANDOM_STR, &_dev_addr);
 
 	memset(&_scan_params, 0, sizeof(_scan_params));
-	_scan_params.type = BT_LE_SCAN_TYPE_ACTIVE;
+	_scan_params.type = BT_LE_SCAN_TYPE_PASSIVE;
 	_scan_params.options = BT_LE_SCAN_OPT_NONE;
 	_scan_params.interval = BT_GAP_SCAN_FAST_INTERVAL;
 	_scan_params.window = BT_GAP_SCAN_FAST_WINDOW;
@@ -449,7 +460,7 @@ cs_ret_code_t BleCentral::discoverServices(ServiceUuid *uuid)
 	// location, so it doesn't matter which element we use here
 	_gatt_discover_params.uuid = uuid != NULL ? &uuid->getUuid()->uuid_16.uuid : NULL;
 	_gatt_discover_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
-	_gatt_discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
+	_gatt_discover_params.end_handle = UINT8_MAX;
 	// discover only primary services to begin with
 	_gatt_discover_params.type = BT_GATT_DISCOVER_PRIMARY;
 	_gatt_discover_params.func = handleDiscoveryResults;
@@ -543,6 +554,29 @@ cs_ret_code_t BleCentral::read(uint16_t handle)
 	}
 
 	return CS_OK;
+}
+
+/**
+ * @brief Send a BLE message. A connection will be established first.
+ * The device will respond with session data directly after the connection.
+ * Callback function for PacketHandler.
+ *
+ * @param inst Pointer to BleCentral class instance.
+ * @param message Pointer to buffer with the message.
+ * @param len Length of the message.
+ */
+void BleCentral::sendBleMessage(void *inst, uint8_t *msg, int msg_len)
+{
+	BleCentral *ble_inst = BleCentral::getInstance();
+
+	if (!ble_inst->isConnected()) {
+		ble_inst->connect((char *)msg);
+		return;
+	} else {
+		if (ble_inst->_controlHandle != 0) {
+			ble_inst->write(ble_inst->_controlHandle, msg, msg_len);
+		}
+	}
 }
 
 /**

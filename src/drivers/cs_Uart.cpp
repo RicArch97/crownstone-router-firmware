@@ -24,7 +24,6 @@ K_THREAD_STACK_DEFINE(uart_tid_stack_area, CS_UART_THREAD_STACK_SIZE);
 static void handleUartMessages(void *inst, void *unused1, void *unused2)
 {
 	Uart *uart_inst = static_cast<Uart *>(inst);
-
 	uint8_t msg_buf[CS_UART_BUFFER_SIZE];
 
 	while (1) {
@@ -33,10 +32,12 @@ static void handleUartMessages(void *inst, void *unused1, void *unused2)
 			LOG_HEXDUMP_DBG(msg_buf, (uint32_t)strlen((char *)msg_buf), "uart message");
 
 			cs_packet_data uart_data;
-			uart_data.buffer = msg_buf;
+			memset(&uart_data, 0, sizeof(uart_data));
 			// UART buffers are null terminated, so get length with strlen
-			uart_data.buffer_len = strlen((char *)msg_buf);
+			size_t msg_len = strlen((char *)msg_buf);
+			uart_data.msg_len = msg_len;
 			uart_data.dest_id = uart_inst->_dest_id;
+			memcpy(&uart_data.msg, msg_buf, msg_len);
 
 			// packets sent from CM4 start with a specific token
 			// handle the packet as incoming
@@ -94,9 +95,7 @@ static void handleUartInterrupt(const device *dev, void *user_data)
 					       K_NO_WAIT) != 0) {
 					k_msgq_purge(&uart_inst->_uart_msgq);
 				}
-
 				uart_inst->_uart_buf_ctr = 0;
-				memset(uart_inst->_uart_buf, 0, sizeof(uart_inst->_uart_buf));
 			}
 		} else if (uart_inst->_uart_buf_ctr < (CS_UART_BUFFER_SIZE - 1)) {
 			uart_inst->_uart_buf[uart_inst->_uart_buf_ctr++] = c;
@@ -193,7 +192,7 @@ cs_ret_code_t Uart::init(cs_uart_config *cfg)
 	// start listening on RX
 	uart_irq_rx_enable(_uart_dev);
 
-	// create thread for handling uart messages and packets
+	// create thread for handling uart messages
 	k_tid_t uart_thread = k_thread_create(
 		&_uart_tid, uart_tid_stack_area, K_THREAD_STACK_SIZEOF(uart_tid_stack_area),
 		handleUartMessages, this, NULL, NULL, CS_UART_THREAD_PRIORITY, 0, K_NO_WAIT);
@@ -207,8 +206,8 @@ cs_ret_code_t Uart::init(cs_uart_config *cfg)
  * @brief Transmit a message over UART. Callback function for PacketHandler.
  *
  * @param inst Pointer to UART class instance.
- * @param msg Pointer to the buffer with the message data.
- * @param msg_len Length of the message data.
+ * @param message Pointer to buffer with the message.
+ * @param len Length of the message.
  */
 void Uart::sendUartMessage(void *inst, uint8_t *msg, int msg_len)
 {

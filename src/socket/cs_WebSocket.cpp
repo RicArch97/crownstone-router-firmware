@@ -42,7 +42,7 @@ static int handleWebsocketConnect(int ws_sock, http_request *req, void *user_dat
  * @param unused1 Unused parameter, is NULL.
  * @param unused2 Unused parameter, is NULL.
  */
-static void handleMessageReceive(void *inst, void *unused1, void *unused2)
+static void handleMessageReceived(void *inst, void *unused1, void *unused2)
 {
 	WebSocket *ws_inst = static_cast<WebSocket *>(inst);
 
@@ -57,10 +57,9 @@ static void handleMessageReceive(void *inst, void *unused1, void *unused2)
 		int ret, read_pos = 0, total_read = 0;
 		// receive data if available, don't block until it is
 		while (remaining_bytes > 0) {
-			ret = websocket_recv_msg(ws_inst->_websock_id,
-						 (ws_inst->_ws_recv_buf + read_pos),
-						 (sizeof(ws_inst->_ws_recv_buf) - read_pos),
-						 &message_type, &remaining_bytes, 0);
+			ret = zsock_recv(ws_inst->_websock_id, (ws_inst->_ws_recv_buf + read_pos),
+					 (sizeof(ws_inst->_ws_recv_buf) - read_pos),
+					 ZSOCK_MSG_DONTWAIT);
 			// there is still data available, try receiving the rest
 			// or: there is no data available, wait for 50ms and reschedule
 			if (ret < 0) {
@@ -80,10 +79,11 @@ static void handleMessageReceive(void *inst, void *unused1, void *unused2)
 
 		// this struct is copied into the work handler
 		cs_packet_data ws_data;
+		memset(&ws_data, 0, sizeof(ws_data));
+		ws_data.msg_len = total_read;
 		ws_data.type = CS_DATA_INCOMING;
 		ws_data.src_id = ws_inst->_src_id;
-		ws_data.buffer = ws_inst->_ws_recv_buf;
-		ws_data.buffer_len = total_read;
+		memcpy(&ws_data.msg, ws_inst->_ws_recv_buf, total_read);
 
 		if (ws_inst->_pkt_handler != NULL) {
 			// dispatch the work item
@@ -135,6 +135,8 @@ cs_ret_code_t WebSocket::connect(const char *url)
 	ws_req.tmp_buf = _ws_recv_tmp_buf;
 	ws_req.tmp_buf_len = sizeof(_ws_recv_tmp_buf);
 
+	LOG_INF("Attempting connection to %s", _host);
+
 	// perform http handshake for websocket connection, and open connection
 	_websock_id = websocket_connect(_sock_id, &ws_req, SYS_FOREVER_MS, this);
 	if (_websock_id < 0) {
@@ -144,11 +146,10 @@ cs_ret_code_t WebSocket::connect(const char *url)
 	}
 
 	// handle message receiving in a thread
-	k_tid_t ws_recv_thread = k_thread_create(
-		&_ws_tid, ws_tid_stack_area, K_THREAD_STACK_SIZEOF(ws_tid_stack_area),
-		handleMessageReceive, this, NULL, NULL, CS_WEBSOCKET_THREAD_PRIORITY, 0, K_NO_WAIT);
-
-	LOG_INF("Attempting websocket connection on %s", _host);
+	k_tid_t ws_recv_thread =
+		k_thread_create(&_ws_tid, ws_tid_stack_area,
+				K_THREAD_STACK_SIZEOF(ws_tid_stack_area), handleMessageReceived,
+				this, NULL, NULL, CS_WEBSOCKET_THREAD_PRIORITY, 0, K_NO_WAIT);
 
 	return CS_OK;
 }
@@ -156,13 +157,14 @@ cs_ret_code_t WebSocket::connect(const char *url)
 /**
  * @brief Send message over websocket. Callback function for PacketHandler.
  *
- * @param inst Pointer to UART class instance.
+ * @param inst Pointer to WebSocket class instance.
  * @param message Pointer to buffer with the message.
  * @param len Length of the message.
  */
 void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
 {
 	WebSocket *ws_inst = static_cast<WebSocket *>(inst);
+	int ret = 0;
 
 	if (!ws_inst->_initialized) {
 		LOG_ERR("%s", "Not initialized");
@@ -173,13 +175,9 @@ void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
 	k_event_wait(&ws_inst->_ws_evts, CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
 
 	// a message is available, make sure it is sent over the websocket
-	int ret = websocket_send_msg(ws_inst->_websock_id, msg, msg_len, WEBSOCKET_OPCODE_DATA_TEXT,
-				     true, true, SYS_FOREVER_MS);
-
+	ret = zsock_send(ws_inst->_websock_id, msg, msg_len, 0);
 	if (ret < 0) {
-		LOG_ERR("Error: %s occured while trying to send message over "
-			"websocket",
-			strerror(ret));
+		LOG_ERR("Could not send message over websocket (err %d)", ret);
 	}
 
 	LOG_DBG("Sent %d bytes", ret);

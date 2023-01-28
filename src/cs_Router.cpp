@@ -23,10 +23,9 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 #define TEST_SSID "ssid"
 #define TEST_PSK  "psk"
 
-#define HOST_ADDR "addr"
+#define HOST_ADDR "ip"
 #define HOST_PORT 14500
 
-#define CROWNSTONE_MAC	"F7:19:A4:EF:EA:F6"
 #define CROWNSTONE_UUID "24f000007d104805bfc17663a01c3bff"
 
 int main(void)
@@ -49,21 +48,22 @@ int main(void)
 
 	WebSocket web_socket(CS_INSTANCE_ID_CLOUD, &pkt_handler);
 	ret |= web_socket.init(HOST_ADDR, CS_SOCKET_IPV4, HOST_PORT);
-	ret |= pkt_handler.registerInputHandler(CS_INSTANCE_ID_CLOUD);
-	ret |= pkt_handler.registerOutputHandler(CS_INSTANCE_ID_CLOUD, &web_socket,
-						 WebSocket::sendMessage);
+	ret |= pkt_handler.registerHandler(CS_INSTANCE_ID_CLOUD, &web_socket,
+					   WebSocket::sendMessage);
 	ret |= web_socket.connect(NULL);
 
 	BleCentral *ble = BleCentral::getInstance();
 	ble->setSourceId(CS_INSTANCE_ID_BLE_CROWNSTONE_PERIPHERAL);
 	ble->setDestinationId(CS_INSTANCE_ID_CLOUD);
 	ret |= ble->init(CROWNSTONE_UUID, &pkt_handler);
+	ret |= pkt_handler.registerHandler(CS_INSTANCE_ID_BLE_CROWNSTONE_PERIPHERAL, &ble,
+					   BleCentral::sendBleMessage);
 
 	const device *rs485_dev = DEVICE_DT_GET(RS485_DEVICE);
 	Uart rs485(rs485_dev, CS_INSTANCE_ID_UART_RS485, CS_INSTANCE_ID_CLOUD, &pkt_handler);
 	ret |= rs485.init(NULL);
-	ret |= pkt_handler.registerOutputHandler(CS_INSTANCE_ID_UART_RS485, &rs485,
-						 Uart::sendUartMessage);
+	ret |= pkt_handler.registerHandler(CS_INSTANCE_ID_UART_RS485, &rs485,
+					   Uart::sendUartMessage);
 
 	if (ret) {
 		LOG_ERR("Failed to initialize router (err %d)", ret);

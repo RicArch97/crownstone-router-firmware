@@ -161,6 +161,8 @@ cs_ret_code_t Wifi::connect()
 		return CS_ERR_NOT_INITIALIZED;
 	}
 
+	LOG_INF("Attempting connection to %s", _ssid);
+
 	if (net_mgmt(NET_REQUEST_WIFI_SCAN, _iface, NULL, 0) != 0) {
 		LOG_ERR("%s", "Scan request failed");
 		return CS_ERR_WIFI_SCAN_REQUEST_FAILED;

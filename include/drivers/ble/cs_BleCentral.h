@@ -26,9 +26,6 @@
 
 #define CS_BLE_CENTRAL_AVAILABLE_EVENT 1
 
-#define CS_BLE_CENTRAL_THREAD_PRIORITY	 K_PRIO_PREEMPT(7)
-#define CS_BLE_CENTRAL_THREAD_STACK_SIZE 4096
-
 #define CS_BLE_CENTRAL_BUFFER_SIZE 256
 #define CS_BLE_CENTRAL_QUEUE_SIZE  2
 
@@ -60,7 +57,7 @@ class BleCentral
 	cs_ret_code_t waitAvailable(int timeout_ms);
 	cs_ret_code_t disconnect();
 
-	static void sendBleMessage(k_work *item);
+	static void sendBleMessage(void *inst, uint8_t *msg, int msg_len);
 
 	bool isInitialized();
 	bool isConnected();
@@ -124,8 +121,8 @@ class BleCentral
 	/** GATT CCC UUID for descriptor discovery */
 	ServiceUuid _uuid_ccc;
 
-	/** Chacracterisctic count to make sure we checked all */
-	uint8_t _chrc_handle_count = 0;
+	/** Used to save the next handle to start discovering */
+	uint16_t _next_handle;
 
 	uint16_t _sessionDataHandle = 0;
 	/** Handle used to control the device */

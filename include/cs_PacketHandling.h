@@ -15,13 +15,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CS_PACKET_HANDLERS_INPUT  2
-#define CS_PACKET_HANDLERS_OUTPUT 7
-
-#define CS_PACKET_BUF_SIZE 256
+#define CS_PACKET_BUF_SIZE   256
+#define CS_PACKET_QUEUE_SIZE 14
+#define CS_PACKET_HANDLERS   7
 
 #define CS_PACKET_UART_START_TOKEN 0x7E
 #define CS_PACKET_UART_CRC_SEED	   0xFFFF
+
+#define CS_PACKET_THREAD_PRIORITY   K_PRIO_PREEMPT(7)
+#define CS_PACKET_THREAD_STACK_SIZE 4096
 
 typedef void (*cs_packet_transport_cb_t)(void *inst, uint8_t *msg, int msg_len);
 
@@ -35,28 +37,14 @@ struct cs_packet_data {
 	cs_router_instance_id dest_id;
 	cs_router_instance_id src_id;
 	cs_router_result_code result_code;
-	uint8_t *buffer;
-	uint16_t buffer_len;
+	uint8_t msg[CS_PACKET_BUF_SIZE];
+	uint16_t msg_len;
 };
 
-struct cs_packet_handler_input {
-	k_work work_item;
-	k_sem work_sem;
-	cs_router_instance_id source_id;
-	uint8_t buffer[CS_PACKET_BUF_SIZE];
-	void *ph_inst;
-};
-
-struct cs_packet_handler_output {
-	k_work work_item;
-	k_sem work_sem;
-	cs_router_instance_id target_id;
-	cs_router_instance_id source_id;
-	cs_router_result_code result_code;
-	void *target_inst;
+struct cs_packet_handler {
+	cs_router_instance_id id;
 	cs_packet_transport_cb_t cb;
-	uint8_t buffer[CS_PACKET_BUF_SIZE];
-	uint16_t buffer_len;
+	void *target_inst;
 	uint16_t result_id;
 };
 
@@ -64,35 +52,29 @@ class PacketHandler
 {
       public:
 	cs_ret_code_t init();
-	cs_ret_code_t registerInputHandler(cs_router_instance_id inst_id);
-	cs_ret_code_t registerOutputHandler(cs_router_instance_id inst_id, void *inst,
-					    cs_packet_transport_cb_t cb);
-	cs_ret_code_t unregisterHandler(cs_packet_transport_type type,
-					cs_router_instance_id inst_id);
-	cs_packet_handler_output *getOutputHandler(cs_router_instance_id inst_id);
+	cs_ret_code_t registerHandler(cs_router_instance_id inst_id, void *inst,
+				      cs_packet_transport_cb_t cb);
+	cs_ret_code_t unregisterHandler(cs_router_instance_id inst_id);
+	cs_packet_handler *getHandler(cs_router_instance_id inst_id);
+	uint16_t *getResultId(cs_router_instance_id inst_id);
 	cs_ret_code_t handlePacket(cs_packet_data *data);
+
+	/** Packet message queue */
+	k_msgq _pkth_msgq;
+	/** Message queue buffer */
+	char __aligned(4) _msgq_buf[sizeof(cs_packet_data) * CS_PACKET_QUEUE_SIZE];
+
+	/** Packet handler thread structure instance */
+	k_thread _pkth_tid;
+	/** Mutex to protect the handlers when the registers is updated */
+	k_mutex _pkth_mtx;
 
       private:
 	/** Initialized flag */
 	bool _initialized = false;
 
-	/**
-	 * Register of handlers for incoming packets
-	 * This amount is 2: UART CM4 and websocket
-	 */
-	cs_packet_handler_input _in_handlers[CS_PACKET_HANDLERS_INPUT];
-	/**
-	 * Register of handlers for outgoing packets
-	 * This amount is 7: UART RS485/RS232/CM4, websocket, BLE mesh/peripheral
-	 */
-	cs_packet_handler_output _out_handlers[CS_PACKET_HANDLERS_OUTPUT];
-
-	/** Mutexes to protect handlers */
-	k_mutex _out_pkth_mtx;
-	k_mutex _in_pkth_mtx;
-
-	/** Amount of outgoing handlers currently registered */
-	int _in_handler_ctr = 0;
-	/** Amount of outgoing handlers currently registered */
-	int _out_handler_ctr = 0;
+	/** Packet handler register */
+	cs_packet_handler _handlers[CS_PACKET_HANDLERS];
+	/** Amount of handlers registered */
+	int _handler_ctr = 0;
 };
