@@ -233,7 +233,6 @@ static void handleOutgoingPacket(cs_packet_data *data, void *pkth)
 		pkt_len = wrapResultPacket(CS_COMMAND_TYPE_REQUEST, data->result_code, *result_id,
 					   data->msg, data->msg_len, pkt_buf);
 		pkt_type = CS_PACKET_TYPE_RESULT;
-		printk("Result pkt len: %d\n", pkt_len);
 		// request handled, reset the result id
 		*result_id = 0;
 	} else {
@@ -256,8 +255,6 @@ static void handleOutgoingPacket(cs_packet_data *data, void *pkth)
 		pkt_len = wrapUartPacket(CS_PACKET_TYPE_GENERIC, generic_pkt_tmp_buf,
 					 generic_pkt_len, pkt_buf);
 	}
-
-	printk("here\n");
 
 	cs_packet_handler *outh = ph_inst->getHandler(data->dest_id);
 	// dispatch packet to the target
@@ -348,7 +345,7 @@ cs_ret_code_t PacketHandler::registerHandler(cs_router_instance_id inst_id, void
 	handler.target_inst = inst;
 
 	// store handler
-	_handlers[_handler_ctr++] = handler;
+	memcpy(&_handlers[_handler_ctr++], &handler, sizeof(handler));
 
 	k_mutex_unlock(&_pkth_mtx);
 
