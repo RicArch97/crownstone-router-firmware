@@ -38,16 +38,15 @@ cs_ret_code_t Socket::init(const char *domain_name, uint16_t port)
 	sprintf(port_str, "%u", port);
 
 	// resolve host using DNS
-	zsock_addrinfo *res;
-	if (zsock_getaddrinfo(domain_name, port_str, &hints, &res) != 0) {
+	if (zsock_getaddrinfo(domain_name, port_str, &hints, &_res) != 0) {
 		LOG_ERR("%s", "Unable to resolve host address");
 		return CS_ERR_SOCKET_UNABLE_TO_RESOLVE_HOST;
 	}
 
-	_addr = *res->ai_addr;
+	_addr = *_res->ai_addr;
 	strncpy(_host, domain_name, sizeof(_host));
 
-	_sock_id = zsock_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	_sock_id = zsock_socket(_res->ai_family, _res->ai_socktype, _res->ai_protocol);
 	if (_sock_id < 0) {
 		LOG_ERR("%s", "Failed to create socket for domain");
 		return CS_ERR_SOCKET_CREATION_FAILED;
@@ -118,4 +117,12 @@ cs_ret_code_t Socket::close()
 	}
 
 	return CS_OK;
+}
+
+/**
+ * @brief Free all heap allocated memory.
+ */
+Socket::~Socket()
+{
+	zsock_freeaddrinfo(_res);
 }

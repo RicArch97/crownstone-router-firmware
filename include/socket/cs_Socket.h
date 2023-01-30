@@ -29,6 +29,8 @@ enum cs_socket_ip {
 class Socket
 {
       public:
+	Socket() = default;
+	~Socket();
 	cs_ret_code_t init(const char *domain_name, uint16_t port);
 	cs_ret_code_t init(const char *peer_addr, cs_socket_ip ip_ver, uint16_t port);
 	cs_ret_code_t close();
@@ -40,6 +42,8 @@ class Socket
 	int _sock_id = -1;
 
       protected:
+	/** Structure containing address info resolved by DNS */
+	zsock_addrinfo *_res;
 	/** Generic structure with address information */
 	sockaddr _addr;
 	/** Length of the address */
