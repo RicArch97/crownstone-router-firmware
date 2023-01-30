@@ -57,9 +57,10 @@ static void handleMessageReceived(void *inst, void *unused1, void *unused2)
 		int ret, read_pos = 0, total_read = 0;
 		// receive data if available, don't block until it is
 		while (remaining_bytes > 0) {
-			ret = zsock_recv(ws_inst->_websock_id, (ws_inst->_ws_recv_buf + read_pos),
-					 (sizeof(ws_inst->_ws_recv_buf) - read_pos),
-					 ZSOCK_MSG_DONTWAIT);
+			ret = websocket_recv_msg(ws_inst->_websock_id,
+						 (ws_inst->_ws_recv_buf + read_pos),
+						 (sizeof(ws_inst->_ws_recv_buf) - read_pos),
+						 &message_type, &remaining_bytes, 0);
 			// there is still data available, try receiving the rest
 			// or: there is no data available, wait for 50ms and reschedule
 			if (ret < 0) {
@@ -175,7 +176,8 @@ void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
 	k_event_wait(&ws_inst->_ws_evts, CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
 
 	// a message is available, make sure it is sent over the websocket
-	ret = zsock_send(ws_inst->_websock_id, msg, msg_len, 0);
+	ret = websocket_send_msg(ws_inst->_websock_id, msg, msg_len, WEBSOCKET_OPCODE_DATA_TEXT,
+				 true, true, 0);
 	if (ret < 0) {
 		LOG_ERR("Could not send message over websocket (err %d)", ret);
 	}

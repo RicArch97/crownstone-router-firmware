@@ -369,8 +369,8 @@ cs_ret_code_t BleCentral::init(const char *base_uuid, PacketHandler *pkt_handler
 	_conn_create_params.window = BT_GAP_SCAN_FAST_WINDOW;
 
 	memset(&_conn_init_params, 0, sizeof(_conn_init_params));
-	_conn_init_params.interval_max = 0x20;
-	_conn_init_params.interval_min = 0x06;
+	_conn_init_params.interval_max = BT_GAP_INIT_CONN_INT_MAX;
+	_conn_init_params.interval_min = BT_GAP_INIT_CONN_INT_MIN;
 	_conn_init_params.timeout = CS_BLE_CENTRAL_CONN_TIMEOUT; // 4 s
 
 	memset(&_conn_cbs, 0, sizeof(_conn_cbs));
