@@ -34,7 +34,7 @@ static void handleUartMessages(void *inst, void *unused1, void *unused2)
 			cs_packet_data uart_data;
 			memset(&uart_data, 0, sizeof(uart_data));
 			// UART buffers are null terminated, so get length with strlen
-			size_t msg_len = strlen((char *)msg_buf);
+			size_t msg_len = MIN(CS_PACKET_BUF_SIZE, strlen((char *)msg_buf));
 			uart_data.msg_len = msg_len;
 			uart_data.dest_id = uart_inst->_dest_id;
 			memcpy(&uart_data.msg, msg_buf, msg_len);

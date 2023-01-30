@@ -18,16 +18,11 @@
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/gatt.h>
 
-#define CS_BLE_CENTRAL_BUFFER_SIZE 256
-
 #define CS_BLE_CENTRAL_CONN_TIMEOUT	    400
 #define CS_BLE_CENTRAL_ADDR_TYPE_RANDOM_STR "random"
 #define CS_BLE_CENTRAL_GATT_WRITE_OVERHEAD  3
 
 #define CS_BLE_CENTRAL_AVAILABLE_EVENT 1
-
-#define CS_BLE_CENTRAL_BUFFER_SIZE 256
-#define CS_BLE_CENTRAL_QUEUE_SIZE  2
 
 enum cs_characteristics_ids {
 	SESSION_DATA_UUID = 0xE,
@@ -111,8 +106,8 @@ class BleCentral
 	/** BT GATT read params */
 	bt_gatt_read_params _gatt_read_params;
 
-	/** BLE buffer of 256 bytes */
-	uint8_t _ble_buf[CS_BLE_CENTRAL_BUFFER_SIZE];
+	/** BLE buffer of 250 bytes */
+	uint8_t _ble_buf[CS_PACKET_BUF_SIZE];
 	/** Counter for the amount of bytes currently in the BLE write buffer */
 	uint16_t _ble_buf_ctr = 0;
 

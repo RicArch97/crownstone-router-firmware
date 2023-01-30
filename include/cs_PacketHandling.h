@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CS_PACKET_BUF_SIZE   256
+#define CS_PACKET_BUF_SIZE   250
 #define CS_PACKET_QUEUE_SIZE 14
 #define CS_PACKET_HANDLERS   7
 
@@ -27,7 +27,7 @@
 
 typedef void (*cs_packet_transport_cb_t)(void *inst, uint8_t *msg, int msg_len);
 
-enum cs_packet_transport_type {
+enum cs_packet_transport_type : uint8_t {
 	CS_DATA_INCOMING,
 	CS_DATA_OUTGOING
 };
@@ -62,7 +62,7 @@ class PacketHandler
 	/** Packet message queue */
 	k_msgq _pkth_msgq;
 	/** Message queue buffer */
-	char __aligned(4) _msgq_buf[sizeof(cs_packet_data) * CS_PACKET_QUEUE_SIZE];
+	char __aligned(8) _msgq_buf[sizeof(cs_packet_data) * CS_PACKET_QUEUE_SIZE];
 
 	/** Packet handler thread structure instance */
 	k_thread _pkth_tid;

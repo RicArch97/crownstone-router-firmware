@@ -80,7 +80,7 @@ class Uart
 	/** UART message queue structure instance */
 	k_msgq _uart_msgq;
 	/** UART message buffer used by the message queue */
-	char __aligned(4) _msgq_buf[CS_UART_BUFFER_QUEUE_SIZE * CS_UART_BUFFER_SIZE];
+	char __aligned(8) _msgq_buf[CS_UART_BUFFER_QUEUE_SIZE * CS_UART_BUFFER_SIZE];
 
 	/** UART thread structure instance */
 	k_thread _uart_tid;
