@@ -443,14 +443,10 @@ cs_ret_code_t PacketHandler::handlePacket(cs_packet_data *data)
 		return CS_ERR_NOT_INITIALIZED;
 	}
 
-	if (k_msgq_num_used_get(&_pkth_msgq) == CS_PACKET_QUEUE_SIZE) {
-		LOG_WRN("%s", "Failed to submit message to packet handler queue, queue is full");
-		return CS_ERR_PACKET_HANDLER_NOT_READY;
-	};
-
 	// dispatch the packet data to be handled later (async)
-	if (k_msgq_put(&_pkth_msgq, data, K_FOREVER) != 0) {
-		LOG_WRN("%s", "Failed to submit message to packet handler queue");
+	// don't wait till space becomes available, as it can cause deadlocks
+	if (k_msgq_put(&_pkth_msgq, data, K_NO_WAIT) != 0) {
+		LOG_WRN("%s", "Failed to submit message to packet handler queue, queue is full");
 		return CS_ERR_PACKET_HANDLER_NOT_READY;
 	};
 
