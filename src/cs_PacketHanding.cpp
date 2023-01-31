@@ -202,17 +202,12 @@ static void handleIncomingPacket(cs_packet_data *data, void *pkth)
 		memset(&out, 0, sizeof(out));
 		cs_packet_handler *outh =
 			ph_inst->getHandler((cs_router_instance_id)ctrl_pkt.dest_id);
+		// > 0 means we need to reply with a result
+		outh->result.id = ctrl_pkt.request_id;
+		outh->result.type = (cs_router_command_type)ctrl_pkt.command_type;
 
-		switch (ctrl_pkt.command_type) {
-		case CS_COMMAND_TYPE_REQUEST:
-			// got a request, need to rely with a result
-			outh->result_id = ctrl_pkt.request_id;
-			__fallthrough;
-		case CS_COMMAND_TYPE_SWITCH:
-			// dispatch data to peripheral
-			outh->cb(outh->target_inst, ctrl_pkt.payload, ctrl_pkt.length);
-			break;
-		}
+		// dispatch data to peripheral
+		outh->cb(outh->target_inst, ctrl_pkt.payload, ctrl_pkt.length);
 	}
 }
 
@@ -228,13 +223,13 @@ static void handleOutgoingPacket(cs_packet_data *data, void *pkth)
 
 	// if a result id was set by the incoming packet handler,
 	// create a result packet for request
-	uint16_t *result_id = ph_inst->getResultId(data->src_id);
-	if (result_id != NULL && *result_id > 0) {
-		pkt_len = wrapResultPacket(CS_COMMAND_TYPE_REQUEST, data->result_code, *result_id,
-					   data->msg, data->msg_len, pkt_buf);
+	cs_packet_result *result = ph_inst->getResult(data->src_id);
+	if (result->id > 0) {
+		pkt_len = wrapResultPacket(result->type, data->result_code, result->id, data->msg,
+					   data->msg_len, pkt_buf);
 		pkt_type = CS_PACKET_TYPE_RESULT;
 		// request handled, reset the result id
-		*result_id = 0;
+		result->id = 0;
 	} else {
 		// all other data is wrapped as "data", the contents are unknown
 		pkt_len = wrapDataPacket(data->src_id, data->msg, data->msg_len, pkt_buf);
@@ -406,14 +401,14 @@ cs_packet_handler *PacketHandler::getHandler(cs_router_instance_id inst_id)
 }
 
 /**
- * @brief Get a result ID for a handler, to check if it was set.
+ * @brief Get a result structure for a handler, to check if it was set.
  * In that case the receiver could reply with a result packet.
  *
  * @param inst_id Instance ID of the instance to check the result id of.
  *
- * @return Pointer to result ID for a handler, or NULL if not found.
+ * @return Pointer to result ID for a result handler, or NULL if not found.
  */
-uint16_t *PacketHandler::getResultId(cs_router_instance_id inst_id)
+cs_packet_result *PacketHandler::getResult(cs_router_instance_id inst_id)
 {
 	if (!_initialized) {
 		LOG_ERR("%s", "Not initialized");
@@ -422,7 +417,7 @@ uint16_t *PacketHandler::getResultId(cs_router_instance_id inst_id)
 
 	for (int i = 0; i < _handler_ctr; i++) {
 		if (_handlers[i].id == inst_id) {
-			return &_handlers[i].result_id;
+			return &_handlers[i].result;
 		}
 	}
 	LOG_ERR("Result ID: Could not find output handler for ID %d", inst_id);

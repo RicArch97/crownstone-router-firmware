@@ -41,11 +41,16 @@ struct cs_packet_data {
 	uint16_t msg_len;
 };
 
+struct cs_packet_result {
+	cs_router_command_type type;
+	uint16_t id;
+};
+
 struct cs_packet_handler {
 	cs_router_instance_id id;
 	cs_packet_transport_cb_t cb;
 	void *target_inst;
-	uint16_t result_id;
+	cs_packet_result result;
 };
 
 class PacketHandler
@@ -56,7 +61,7 @@ class PacketHandler
 				      cs_packet_transport_cb_t cb);
 	cs_ret_code_t unregisterHandler(cs_router_instance_id inst_id);
 	cs_packet_handler *getHandler(cs_router_instance_id inst_id);
-	uint16_t *getResultId(cs_router_instance_id inst_id);
+	cs_packet_result *getResult(cs_router_instance_id inst_id);
 	cs_ret_code_t handlePacket(cs_packet_data *data);
 
 	/** Packet message queue */

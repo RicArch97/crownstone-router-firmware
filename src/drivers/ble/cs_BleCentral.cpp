@@ -19,7 +19,43 @@ LOG_MODULE_REGISTER(cs_BleCentral, LOG_LEVEL_INF);
 static uint8_t handleNotifications(bt_conn *conn, bt_gatt_subscribe_params *params,
 				   const void *data, uint16_t length)
 {
-	LOG_HEXDUMP_DBG(data, length, "Notification");
+	BleCentral *ble_inst = BleCentral::getInstance();
+
+	if (!conn || !data) {
+		return BT_GATT_ITER_STOP;
+	}
+
+	if ((ble_inst->_ble_buf_ctr + length) > sizeof(ble_inst->_ble_buf)) {
+		LOG_ERR("%s", "Failed to parse notification, length exceeds buffer size");
+		return BT_GATT_ITER_STOP;
+	}
+	// add data to buffer, notification comes in chunks
+	memcpy(ble_inst->_ble_buf + ble_inst->_ble_buf_ctr, (uint8_t *)data, length);
+	ble_inst->_ble_buf_ctr += length;
+
+	if (length < CS_BLE_NOTIF_PACKET_SIZE) {
+		LOG_HEXDUMP_DBG(ble_inst->_ble_buf, ble_inst->_ble_buf_ctr, "Notification");
+
+		cs_packet_data ble_notif_data;
+		memset(&ble_notif_data, 0, sizeof(ble_notif_data));
+		ble_notif_data.msg_len = ble_inst->_ble_buf_ctr;
+		ble_notif_data.src_id = ble_inst->_src_id;
+		ble_notif_data.dest_id = ble_inst->_dest_id;
+		ble_notif_data.type = CS_DATA_OUTGOING;
+		ble_notif_data.result_code = CS_RESULT_TYPE_SUCCES;
+		memcpy(&ble_notif_data.msg, ble_inst->_ble_buf, ble_inst->_ble_buf_ctr);
+
+		if (ble_inst->_pkt_handler != NULL) {
+			// data is copied into work handler, so we don't have to save the struct
+			ble_inst->_pkt_handler->handlePacket(&ble_notif_data);
+		} else {
+			LOG_WRN("%s", "Failed to handle BLE notification");
+		}
+
+		ble_inst->_ble_buf_ctr = 0;
+		ble_inst->disconnect();
+		return BT_GATT_ITER_STOP;
+	}
 
 	return BT_GATT_ITER_CONTINUE;
 }
@@ -208,7 +244,7 @@ static uint8_t handleReadResult(bt_conn *conn, uint8_t err, bt_gatt_read_params 
 		return BT_GATT_ITER_STOP;
 	}
 	// add data to buffer, in case the read data exceeds our MTU read is done in chunks
-	memcpy(ble_inst->_ble_buf, ((uint8_t *)data + offset), length);
+	memcpy(ble_inst->_ble_buf + offset, (uint8_t *)data, length);
 	ble_inst->_ble_buf_ctr += length;
 
 	return BT_GATT_ITER_CONTINUE;
@@ -245,7 +281,7 @@ static void handleBleDeviceFound(const bt_addr_le_t *addr, int8_t rssi, uint8_t 
 	}
 
 	int ret;
-	// we have found the device, stop the scan`
+	// we have found the device, stop the scan
 	ret = bt_le_scan_stop();
 	if (ret) {
 		LOG_ERR("Stop LE scan failed (err %d)", ret);
@@ -276,7 +312,7 @@ static void handleConnectionResult(bt_conn *conn, uint8_t conn_err)
 
 		bt_conn_unref(ble_inst->_conn);
 		ble_inst->_conn = NULL;
-
+		k_msleep(50);
 		ble_inst->connect(dev);
 		return;
 	}
@@ -319,7 +355,9 @@ static void handleDisonnectionResult(bt_conn *conn, uint8_t reason)
 	k_event_post(&ble_inst->_ble_conn_evts, CS_BLE_CENTRAL_AVAILABLE_EVENT);
 
 	// if we didn't manually disconnect, retry
-	if (reason != BT_HCI_ERR_REMOTE_USER_TERM_CONN) {
+	if (reason != BT_HCI_ERR_REMOTE_USER_TERM_CONN &&
+	    reason != BT_HCI_ERR_LOCALHOST_TERM_CONN) {
+		k_msleep(50);
 		ble_inst->connect(dev);
 	}
 }
