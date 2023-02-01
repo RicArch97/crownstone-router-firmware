@@ -49,11 +49,11 @@ static void handleMessageReceived(void *inst, void *unused1, void *unused2)
 	uint32_t message_type;
 	uint64_t remaining_bytes = ULLONG_MAX;
 
-	while (1) {
-		// wait for connection to websocket before trying to receive messages from
-		// peripherals
-		k_event_wait(&ws_inst->_ws_evts, CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
+	// wait for connection to websocket before trying to receive messages from
+	// peripherals
+	k_event_wait(&ws_inst->_ws_evts, CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
 
+	while (1) {
 		int ret, read_pos = 0, total_read = 0;
 		// receive data if available, don't block until it is
 		while (remaining_bytes > 0) {
@@ -177,7 +177,7 @@ void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
 
 	// a message is available, make sure it is sent over the websocket
 	ret = websocket_send_msg(ws_inst->_websock_id, msg, msg_len, WEBSOCKET_OPCODE_DATA_TEXT,
-				 true, true, 0);
+				 true, true, SYS_FOREVER_MS);
 	if (ret < 0) {
 		LOG_ERR("Could not send message over websocket (err %d)", ret);
 	}

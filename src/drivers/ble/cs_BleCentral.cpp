@@ -293,6 +293,7 @@ static void handleBleDeviceFound(const bt_addr_le_t *addr, int8_t rssi, uint8_t 
 				&ble_inst->_conn);
 	if (ret) {
 		LOG_ERR("Failed to create LE connection instance (err %d)", ret);
+		k_msleep(CS_BLE_CENTRAL_RECONNECT_TIMEOUT);
 		ble_inst->connect(dev);
 	}
 }
@@ -312,7 +313,7 @@ static void handleConnectionResult(bt_conn *conn, uint8_t conn_err)
 
 		bt_conn_unref(ble_inst->_conn);
 		ble_inst->_conn = NULL;
-		k_msleep(50);
+		k_msleep(CS_BLE_CENTRAL_RECONNECT_TIMEOUT);
 		ble_inst->connect(dev);
 		return;
 	}
@@ -357,7 +358,8 @@ static void handleDisonnectionResult(bt_conn *conn, uint8_t reason)
 	// if we didn't manually disconnect, retry
 	if (reason != BT_HCI_ERR_REMOTE_USER_TERM_CONN &&
 	    reason != BT_HCI_ERR_LOCALHOST_TERM_CONN) {
-		k_msleep(50);
+		// allow other tasks to run first before trying again
+		k_msleep(CS_BLE_CENTRAL_RECONNECT_TIMEOUT);
 		ble_inst->connect(dev);
 	}
 }
@@ -453,10 +455,12 @@ cs_ret_code_t BleCentral::connect(const char *device_addr)
 
 	// convert given string MAC address to bytes
 	bt_addr_le_from_str(device_addr, CS_BLE_CENTRAL_ADDR_TYPE_RANDOM_STR, &_dev_addr);
+	// add to filter accept list to avoid unnessecary scan results
+	bt_le_filter_accept_list_add(&_dev_addr);
 
 	memset(&_scan_params, 0, sizeof(_scan_params));
 	_scan_params.type = BT_LE_SCAN_TYPE_PASSIVE;
-	_scan_params.options = BT_LE_SCAN_OPT_NONE;
+	_scan_params.options = BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST;
 	_scan_params.interval = BT_GAP_SCAN_FAST_INTERVAL;
 	_scan_params.window = BT_GAP_SCAN_FAST_WINDOW;
 
