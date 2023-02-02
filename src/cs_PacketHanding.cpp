@@ -13,7 +13,7 @@ LOG_MODULE_REGISTER(cs_PacketHandling, LOG_LEVEL_INF);
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/crc.h>
 
-K_THREAD_STACK_DEFINE(packet_tid_stack_area, CS_PACKET_THREAD_STACK_SIZE);
+K_THREAD_STACK_DEFINE(pkth_tid_stack_area, CS_PACKET_THREAD_STACK_SIZE);
 
 /**
  * @brief Wrap a payload into an UART packet.
@@ -188,10 +188,10 @@ static void handleIncomingPacket(cs_packet_data *data, void *pkth)
 
 	if (data->src_id == CS_INSTANCE_ID_UART_CM4) {
 		cs_router_uart_packet uart_pkt;
-		loadUartPacket(&uart_pkt, data->msg);
+		loadUartPacket(&uart_pkt, data->msg.buf);
 		loadGenericPacket(&generic_pkt, uart_pkt.payload);
 	} else {
-		loadGenericPacket(&generic_pkt, data->msg);
+		loadGenericPacket(&generic_pkt, data->msg.buf);
 	}
 
 	if (generic_pkt.type == CS_PACKET_TYPE_CONTROL) {
@@ -205,9 +205,10 @@ static void handleIncomingPacket(cs_packet_data *data, void *pkth)
 		// > 0 means we need to reply with a result
 		outh->result.id = ctrl_pkt.request_id;
 		outh->result.type = (cs_router_command_type)ctrl_pkt.command_type;
-
+		outh->msg.buf_len = ctrl_pkt.length;
+		memcpy(outh->msg.buf, ctrl_pkt.payload, ctrl_pkt.length);
 		// dispatch data to peripheral
-		outh->cb(outh->target_inst, ctrl_pkt.payload, ctrl_pkt.length);
+		k_work_submit(&outh->work_item);
 	}
 }
 
@@ -225,14 +226,14 @@ static void handleOutgoingPacket(cs_packet_data *data, void *pkth)
 	// create a result packet for request
 	cs_packet_result *result = ph_inst->getResult(data->src_id);
 	if (result->id > 0) {
-		pkt_len = wrapResultPacket(result->type, data->result_code, result->id, data->msg,
-					   data->msg_len, pkt_buf);
+		pkt_len = wrapResultPacket(result->type, data->result_code, result->id,
+					   data->msg.buf, data->msg.buf_len, pkt_buf);
 		pkt_type = CS_PACKET_TYPE_RESULT;
 		// request handled, reset the result id
 		result->id = 0;
 	} else {
 		// all other data is wrapped as "data", the contents are unknown
-		pkt_len = wrapDataPacket(data->src_id, data->msg, data->msg_len, pkt_buf);
+		pkt_len = wrapDataPacket(data->src_id, data->msg.buf, data->msg.buf_len, pkt_buf);
 		pkt_type = CS_PACKET_TYPE_DATA;
 	}
 
@@ -252,8 +253,10 @@ static void handleOutgoingPacket(cs_packet_data *data, void *pkth)
 	}
 
 	cs_packet_handler *outh = ph_inst->getHandler(data->dest_id);
+	outh->msg.buf_len = pkt_len;
+	memcpy(outh->msg.buf, pkt_buf, pkt_len);
 	// dispatch packet to the target
-	outh->cb(outh->target_inst, pkt_buf, pkt_len);
+	k_work_submit(&outh->work_item);
 }
 
 /**
@@ -301,7 +304,7 @@ cs_ret_code_t PacketHandler::init()
 
 	// create thread for handling uart messages
 	k_tid_t uart_thread = k_thread_create(
-		&_pkth_tid, packet_tid_stack_area, K_THREAD_STACK_SIZEOF(packet_tid_stack_area),
+		&_pkth_tid, pkth_tid_stack_area, K_THREAD_STACK_SIZEOF(pkth_tid_stack_area),
 		handlePacketBuffers, this, NULL, NULL, CS_PACKET_THREAD_PRIORITY, 0, K_NO_WAIT);
 
 	_initialized = true;
@@ -317,7 +320,7 @@ cs_ret_code_t PacketHandler::init()
  * @param cb Function pointer to function that should be called to transport the data.
  */
 cs_ret_code_t PacketHandler::registerHandler(cs_router_instance_id inst_id, void *inst,
-					     cs_packet_transport_cb_t cb)
+					     k_work_handler_t cb)
 {
 	if (!_initialized) {
 		LOG_ERR("%s", "Not initialized");
@@ -336,8 +339,9 @@ cs_ret_code_t PacketHandler::registerHandler(cs_router_instance_id inst_id, void
 	cs_packet_handler handler;
 	memset(&handler, 0, sizeof(handler));
 	handler.id = inst_id;
-	handler.cb = cb;
 	handler.target_inst = inst;
+
+	k_work_init(&handler.work_item, cb);
 
 	// store handler
 	memcpy(&_handlers[_handler_ctr++], &handler, sizeof(handler));

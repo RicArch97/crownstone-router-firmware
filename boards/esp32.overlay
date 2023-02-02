@@ -15,14 +15,13 @@
 };
 
 // Enable W5500 Ethernet module
-// &spi3 {
+// &spi2 {
 // 	status = "okay";
-// 	clock-frequency = <1000000>;
 // 	w5500: w5500@0 {
 // 		compatible = "wiznet,w5500";
 // 		reg = <0>;
-// 		spi-max-frequency = <1000000>;
-// 		reset-gpios = <&gpio 25 GPIO_ACTIVE_LOW>;
+// 		spi-max-frequency = <10000000>;
+// 		reset-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
 //     int-gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
 // 	};
 // };

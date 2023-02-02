@@ -43,7 +43,7 @@ class Socket
 
       protected:
 	/** Structure containing address info resolved by DNS */
-	zsock_addrinfo *_res;
+	zsock_addrinfo *_res = NULL;
 	/** Generic structure with address information */
 	sockaddr _addr;
 	/** Length of the address */

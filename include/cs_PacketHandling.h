@@ -22,7 +22,7 @@
 #define CS_PACKET_UART_START_TOKEN 0x7E
 #define CS_PACKET_UART_CRC_SEED	   0xFFFF
 
-#define CS_PACKET_THREAD_PRIORITY   K_PRIO_PREEMPT(7)
+#define CS_PACKET_THREAD_PRIORITY   K_PRIO_COOP(7)
 #define CS_PACKET_THREAD_STACK_SIZE 4096
 
 typedef void (*cs_packet_transport_cb_t)(void *inst, uint8_t *msg, int msg_len);
@@ -32,13 +32,17 @@ enum cs_packet_transport_type : uint8_t {
 	CS_DATA_OUTGOING
 };
 
+struct cs_packet_buffer {
+	uint8_t buf[CS_PACKET_BUF_SIZE];
+	uint16_t buf_len;
+};
+
 struct cs_packet_data {
 	cs_packet_transport_type type;
 	cs_router_instance_id dest_id;
 	cs_router_instance_id src_id;
 	cs_router_result_code result_code;
-	uint8_t msg[CS_PACKET_BUF_SIZE];
-	uint16_t msg_len;
+	cs_packet_buffer msg;
 };
 
 struct cs_packet_result {
@@ -47,9 +51,11 @@ struct cs_packet_result {
 };
 
 struct cs_packet_handler {
+	k_work work_item;
+	k_spinlock work_lock;
 	cs_router_instance_id id;
-	cs_packet_transport_cb_t cb;
 	void *target_inst;
+	cs_packet_buffer msg;
 	cs_packet_result result;
 };
 
@@ -58,7 +64,7 @@ class PacketHandler
       public:
 	cs_ret_code_t init();
 	cs_ret_code_t registerHandler(cs_router_instance_id inst_id, void *inst,
-				      cs_packet_transport_cb_t cb);
+				      k_work_handler_t cb);
 	cs_ret_code_t unregisterHandler(cs_router_instance_id inst_id);
 	cs_packet_handler *getHandler(cs_router_instance_id inst_id);
 	cs_packet_result *getResult(cs_router_instance_id inst_id);

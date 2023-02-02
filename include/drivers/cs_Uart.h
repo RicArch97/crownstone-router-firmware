@@ -26,7 +26,7 @@
 #define CS_UART_BUFFER_SIZE	  256
 #define CS_UART_BUFFER_QUEUE_SIZE 2
 
-#define CS_UART_THREAD_PRIORITY	  K_PRIO_PREEMPT(7)
+#define CS_UART_THREAD_PRIORITY	  K_PRIO_COOP(7)
 #define CS_UART_THREAD_STACK_SIZE 4096
 
 /**
@@ -62,7 +62,7 @@ class Uart
 	cs_ret_code_t init(cs_uart_config *cfg);
 	void disable();
 
-	static void sendUartMessage(void *inst, uint8_t *msg, int msg_len);
+	static void sendUartMessage(k_work *work);
 
 	/** Initialized flag */
 	bool _initialized = false;

@@ -16,7 +16,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define CS_WEBSOCKET_THREAD_PRIORITY   K_PRIO_PREEMPT(7)
+#define CS_WEBSOCKET_THREAD_PRIORITY   K_PRIO_COOP(7)
 #define CS_WEBSOCKET_THREAD_STACK_SIZE 4096
 
 #define CS_WEBSOCKET_HTTP_HEADER_SIZE  30
@@ -41,7 +41,7 @@ class WebSocket : public Socket
 	cs_ret_code_t connect(const char *url);
 	cs_ret_code_t close();
 
-	static void sendMessage(void *inst, uint8_t *msg, int msg_len);
+	static void sendMessage(k_work *work);
 
 	/** ID of the websocket */
 	int _websock_id = -1;

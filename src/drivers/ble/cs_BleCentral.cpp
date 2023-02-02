@@ -25,25 +25,28 @@ static uint8_t handleNotifications(bt_conn *conn, bt_gatt_subscribe_params *para
 		return BT_GATT_ITER_STOP;
 	}
 
-	if ((ble_inst->_ble_buf_ctr + length) > sizeof(ble_inst->_ble_buf)) {
+	uint8_t *part = (uint8_t *)data;
+	uint8_t counter = part[0];
+
+	if ((ble_inst->_ble_buf_ctr + length - 1U) > sizeof(ble_inst->_ble_buf)) {
 		LOG_ERR("%s", "Failed to parse notification, length exceeds buffer size");
 		return BT_GATT_ITER_STOP;
 	}
-	// add data to buffer, notification comes in chunks
-	memcpy(ble_inst->_ble_buf + ble_inst->_ble_buf_ctr, (uint8_t *)data, length);
-	ble_inst->_ble_buf_ctr += length;
+	// add data to buffer, notification comes in chunks (first byte is counter)
+	memcpy(ble_inst->_ble_buf + ble_inst->_ble_buf_ctr, part + 1, length - 1);
+	ble_inst->_ble_buf_ctr += length - 1;
 
-	if (length < CS_BLE_NOTIF_PACKET_SIZE) {
+	if (counter == UINT8_MAX) {
 		LOG_HEXDUMP_DBG(ble_inst->_ble_buf, ble_inst->_ble_buf_ctr, "Notification");
 
 		cs_packet_data ble_notif_data;
 		memset(&ble_notif_data, 0, sizeof(ble_notif_data));
-		ble_notif_data.msg_len = ble_inst->_ble_buf_ctr;
+		ble_notif_data.msg.buf_len = ble_inst->_ble_buf_ctr;
 		ble_notif_data.src_id = ble_inst->_src_id;
 		ble_notif_data.dest_id = ble_inst->_dest_id;
 		ble_notif_data.type = CS_DATA_OUTGOING;
 		ble_notif_data.result_code = CS_RESULT_TYPE_SUCCES;
-		memcpy(&ble_notif_data.msg, ble_inst->_ble_buf, ble_inst->_ble_buf_ctr);
+		memcpy(&ble_notif_data.msg.buf, ble_inst->_ble_buf, ble_inst->_ble_buf_ctr);
 
 		if (ble_inst->_pkt_handler != NULL) {
 			// data is copied into work handler, so we don't have to save the struct
@@ -207,12 +210,12 @@ static uint8_t handleReadResult(bt_conn *conn, uint8_t err, bt_gatt_read_params 
 
 		cs_packet_data ble_read_data;
 		memset(&ble_read_data, 0, sizeof(ble_read_data));
-		ble_read_data.msg_len = ble_inst->_ble_buf_ctr;
+		ble_read_data.msg.buf_len = ble_inst->_ble_buf_ctr;
 		ble_read_data.src_id = ble_inst->_src_id;
 		ble_read_data.dest_id = ble_inst->_dest_id;
 		ble_read_data.type = CS_DATA_OUTGOING;
 		ble_read_data.result_code = CS_RESULT_TYPE_SUCCES;
-		memcpy(&ble_read_data.msg, ble_inst->_ble_buf, ble_inst->_ble_buf_ctr);
+		memcpy(&ble_read_data.msg.buf, ble_inst->_ble_buf, ble_inst->_ble_buf_ctr);
 
 		if (ble_inst->_pkt_handler != NULL) {
 			// data is copied into work handler, so we don't have to save the struct
@@ -350,6 +353,9 @@ static void handleDisonnectionResult(bt_conn *conn, uint8_t reason)
 		return;
 	}
 
+	// cleanup accept list
+	bt_le_filter_accept_list_clear();
+
 	bt_conn_unref(ble_inst->_conn);
 	ble_inst->_conn = NULL;
 	// we are ready for a new connection again
@@ -358,7 +364,6 @@ static void handleDisonnectionResult(bt_conn *conn, uint8_t reason)
 	// if we didn't manually disconnect, retry
 	if (reason != BT_HCI_ERR_REMOTE_USER_TERM_CONN &&
 	    reason != BT_HCI_ERR_LOCALHOST_TERM_CONN) {
-		// allow other tasks to run first before trying again
 		k_msleep(CS_BLE_CENTRAL_RECONNECT_TIMEOUT);
 		ble_inst->connect(dev);
 	}
@@ -607,16 +612,22 @@ cs_ret_code_t BleCentral::read(uint16_t handle)
  * @param message Pointer to buffer with the message.
  * @param len Length of the message.
  */
-void BleCentral::sendBleMessage(void *inst, uint8_t *msg, int msg_len)
+void BleCentral::sendBleMessage(k_work *work)
 {
+	cs_packet_handler *hdlr = CONTAINER_OF(work, cs_packet_handler, work_item);
 	BleCentral *ble_inst = BleCentral::getInstance();
+	k_spinlock_key_t key;
+
+	key = k_spin_lock(&hdlr->work_lock);
 
 	if (!ble_inst->isConnected()) {
-		ble_inst->connect((char *)msg);
+		ble_inst->connect((char *)hdlr->msg.buf);
+		k_spin_unlock(&hdlr->work_lock, key);
 		return;
 	} else {
 		if (ble_inst->_controlHandle != 0) {
-			ble_inst->write(ble_inst->_controlHandle, msg, msg_len);
+			ble_inst->write(ble_inst->_controlHandle, hdlr->msg.buf, hdlr->msg.buf_len);
+			k_spin_unlock(&hdlr->work_lock, key);
 		}
 	}
 }

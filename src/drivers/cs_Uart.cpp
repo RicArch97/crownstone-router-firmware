@@ -35,9 +35,9 @@ static void handleUartMessages(void *inst, void *unused1, void *unused2)
 			memset(&uart_data, 0, sizeof(uart_data));
 			// UART buffers are null terminated, so get length with strlen
 			size_t msg_len = MIN(CS_PACKET_BUF_SIZE, strlen((char *)msg_buf));
-			uart_data.msg_len = msg_len;
+			uart_data.msg.buf_len = msg_len;
 			uart_data.dest_id = uart_inst->_dest_id;
-			memcpy(&uart_data.msg, msg_buf, msg_len);
+			memcpy(&uart_data.msg.buf, msg_buf, msg_len);
 
 			// packets sent from CM4 start with a specific token
 			// handle the packet as incoming
@@ -209,18 +209,24 @@ cs_ret_code_t Uart::init(cs_uart_config *cfg)
  * @param message Pointer to buffer with the message.
  * @param len Length of the message.
  */
-void Uart::sendUartMessage(void *inst, uint8_t *msg, int msg_len)
+void Uart::sendUartMessage(k_work *work)
 {
-	Uart *uart_inst = static_cast<Uart *>(inst);
+	cs_packet_handler *hdlr = CONTAINER_OF(work, cs_packet_handler, work_item);
+	Uart *uart_inst = static_cast<Uart *>(hdlr->target_inst);
+	k_spinlock_key_t key;
 
 	if (!uart_inst->_initialized) {
 		LOG_ERR("%s", "Not initialized");
 		return;
 	}
 
-	memcpy(uart_inst->_uart_buf, msg, msg_len);
-	uart_inst->_uart_buf_ctr = msg_len;
+	key = k_spin_lock(&hdlr->work_lock);
+
+	memcpy(uart_inst->_uart_buf, hdlr->msg.buf, hdlr->msg.buf_len);
+	uart_inst->_uart_buf_ctr = hdlr->msg.buf_len;
 	uart_inst->_uart_buf_ptr = &uart_inst->_uart_buf[0];
+
+	k_spin_unlock(&hdlr->work_lock, key);
 
 	uart_irq_rx_disable(uart_inst->_uart_dev);
 	uart_irq_tx_enable(uart_inst->_uart_dev);

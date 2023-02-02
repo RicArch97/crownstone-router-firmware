@@ -22,7 +22,6 @@
 #define CS_WIFI_CONNECTED_EVENT	 2
 // timeouts in ms
 #define CS_WIFI_SCAN_TIMEOUT	 5000
-#define CS_WIFI_CONNECT_TIMOUT	 10000
 
 class Wifi
 {
@@ -52,8 +51,13 @@ class Wifi
 	/** Length of the provided PSK */
 	uint8_t _psk_len = 0;
 
+	/** Callback for wifi events */
+	net_mgmt_event_callback _wifi_mgmt_cb;
+	/** Callback for network events */
+	net_mgmt_event_callback _dhcp_mgmt_cb;
+
 	/** Structure with parameters for a wifi connect request */
-	wifi_connect_req_params _cnx_params = {0};
+	wifi_connect_req_params _cnx_params;
 
 	/** Event structure used for wifi events */
 	k_event _wifi_evts;

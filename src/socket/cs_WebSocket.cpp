@@ -81,10 +81,10 @@ static void handleMessageReceived(void *inst, void *unused1, void *unused2)
 		// this struct is copied into the work handler
 		cs_packet_data ws_data;
 		memset(&ws_data, 0, sizeof(ws_data));
-		ws_data.msg_len = total_read;
+		ws_data.msg.buf_len = total_read;
 		ws_data.type = CS_DATA_INCOMING;
 		ws_data.src_id = ws_inst->_src_id;
-		memcpy(&ws_data.msg, ws_inst->_ws_recv_buf, total_read);
+		memcpy(&ws_data.msg.buf, ws_inst->_ws_recv_buf, total_read);
 
 		if (ws_inst->_pkt_handler != NULL) {
 			// dispatch the work item
@@ -162,9 +162,11 @@ cs_ret_code_t WebSocket::connect(const char *url)
  * @param message Pointer to buffer with the message.
  * @param len Length of the message.
  */
-void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
+void WebSocket::sendMessage(k_work *work)
 {
-	WebSocket *ws_inst = static_cast<WebSocket *>(inst);
+	cs_packet_handler *hdlr = CONTAINER_OF(work, cs_packet_handler, work_item);
+	WebSocket *ws_inst = static_cast<WebSocket *>(hdlr->target_inst);
+	k_spinlock_key_t key;
 	int ret = 0;
 
 	if (!ws_inst->_initialized) {
@@ -175,9 +177,11 @@ void WebSocket::sendMessage(void *inst, uint8_t *msg, int msg_len)
 	// wait for connection to websocket before trying to receive messages from peripherals
 	k_event_wait(&ws_inst->_ws_evts, CS_WEBSOCKET_CONNECTED_EVENT, false, K_FOREVER);
 
+	key = k_spin_lock(&hdlr->work_lock);
 	// a message is available, make sure it is sent over the websocket
-	ret = websocket_send_msg(ws_inst->_websock_id, msg, msg_len, WEBSOCKET_OPCODE_DATA_TEXT,
-				 true, true, SYS_FOREVER_MS);
+	ret = websocket_send_msg(ws_inst->_websock_id, hdlr->msg.buf, hdlr->msg.buf_len,
+				 WEBSOCKET_OPCODE_DATA_TEXT, true, true, SYS_FOREVER_MS);
+	k_spin_unlock(&hdlr->work_lock, key);
 	if (ret < 0) {
 		LOG_ERR("Could not send message over websocket (err %d)", ret);
 	}

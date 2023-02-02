@@ -20,10 +20,10 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 
 #define RS485_DEVICE DT_NODELABEL(uart2)
 
-#define TEST_SSID "ssid"
-#define TEST_PSK  "psk"
+#define TEST_SSID "Crownstone"
+#define TEST_PSK  "likeashotjogger"
 
-#define HOST_ADDR "ip"
+#define HOST_ADDR "10.27.8.121"
 #define HOST_PORT 14500
 
 #define CROWNSTONE_UUID "24f000007d104805bfc17663a01c3bff"

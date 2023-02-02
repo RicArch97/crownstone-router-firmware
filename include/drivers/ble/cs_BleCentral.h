@@ -19,10 +19,9 @@
 #include <zephyr/bluetooth/gatt.h>
 
 #define CS_BLE_CENTRAL_CONN_TIMEOUT	    400
-#define CS_BLE_CENTRAL_RECONNECT_TIMEOUT 50
+#define CS_BLE_CENTRAL_RECONNECT_TIMEOUT 100
 #define CS_BLE_CENTRAL_ADDR_TYPE_RANDOM_STR "random"
 #define CS_BLE_CENTRAL_GATT_WRITE_OVERHEAD  3
-#define CS_BLE_NOTIF_PACKET_SIZE 16
 
 #define CS_BLE_CENTRAL_AVAILABLE_EVENT 1
 
@@ -54,7 +53,7 @@ class BleCentral
 	cs_ret_code_t waitAvailable(int timeout_ms);
 	cs_ret_code_t disconnect();
 
-	static void sendBleMessage(void *inst, uint8_t *msg, int msg_len);
+	static void sendBleMessage(k_work *work);
 
 	bool isInitialized();
 	bool isConnected();
