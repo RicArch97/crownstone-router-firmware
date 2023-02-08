@@ -20,6 +20,7 @@ typedef int cs_ret_code_t;
 #define CS_ERR_NOT_ENABLED	       0x106
 #define CS_ERR_INVALID_PARAM	       0x107
 #define CS_ERR_TIMEOUT		       0x108
+#define CS_ERR_ABORTED		       0x109
 
 #define CS_ERR_WIFI_CONNECT_REQUEST_FAILED    0x201
 #define CS_ERR_WIFI_SCAN_REQUEST_FAILED	      0x202

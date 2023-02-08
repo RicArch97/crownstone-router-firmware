@@ -88,9 +88,14 @@ static void handleMessageReceived(void *inst, void *unused1, void *unused2)
 
 		if (ws_inst->_pkt_handler != NULL) {
 			// dispatch the work item
-			ws_inst->_pkt_handler->handlePacket(&ws_data);
+			int ret = ws_inst->_pkt_handler->handlePacket(&ws_data);
+			// handler not running due to error, abort
+			if (ret == CS_ERR_ABORTED) {
+				break;
+			}
 		} else {
 			LOG_WRN("%s", "Failed to handle websocket packet");
+			break;
 		}
 
 		remaining_bytes = ULLONG_MAX;

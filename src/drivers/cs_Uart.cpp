@@ -51,10 +51,15 @@ static void handleUartMessages(void *inst, void *unused1, void *unused2)
 			}
 
 			if (uart_inst->_pkt_handler != NULL) {
-				// struct is copied into the work queue handle
-				uart_inst->_pkt_handler->handlePacket(&uart_data);
+				// dispatch the work item
+				int ret = uart_inst->_pkt_handler->handlePacket(&uart_data);
+				// handler not running due to error, abort
+				if (ret == CS_ERR_ABORTED) {
+					break;
+				}
 			} else {
 				LOG_WRN("%s", "Failed to handle UART message");
+				break;
 			}
 		}
 	}
@@ -246,5 +251,6 @@ void Uart::disable()
  */
 Uart::~Uart()
 {
+	disable();
 	k_msgq_cleanup(&_uart_msgq);
 }

@@ -224,7 +224,7 @@ static void handleOutgoingPacket(cs_packet_data *data, void *pkth)
 
 	// if a result id was set by the incoming packet handler,
 	// create a result packet for request
-	cs_packet_result *result = ph_inst->getResult(data->src_id);
+	cs_packet_result *result = &ph_inst->getHandler(data->src_id)->result;
 	if (result->id > 0) {
 		pkt_len = wrapResultPacket(result->type, data->result_code, result->id,
 					   data->msg.buf, data->msg.buf_len, pkt_buf);
@@ -405,30 +405,6 @@ cs_packet_handler *PacketHandler::getHandler(cs_router_instance_id inst_id)
 }
 
 /**
- * @brief Get a result structure for a handler, to check if it was set.
- * In that case the receiver could reply with a result packet.
- *
- * @param inst_id Instance ID of the instance to check the result id of.
- *
- * @return Pointer to result ID for a result handler, or NULL if not found.
- */
-cs_packet_result *PacketHandler::getResult(cs_router_instance_id inst_id)
-{
-	if (!_initialized) {
-		LOG_ERR("%s", "Not initialized");
-		return NULL;
-	}
-
-	for (int i = 0; i < _handler_ctr; i++) {
-		if (_handlers[i].id == inst_id) {
-			return &_handlers[i].result;
-		}
-	}
-	LOG_ERR("Result ID: Could not find output handler for ID %d", inst_id);
-	return NULL;
-}
-
-/**
  * @brief Handle packet by calling the associated callback for an instance.
  *
  * @param data Structure with packet data. One of @ref cs_packet_data
@@ -440,6 +416,12 @@ cs_ret_code_t PacketHandler::handlePacket(cs_packet_data *data)
 	if (!_initialized) {
 		LOG_ERR("%s", "Not initialized");
 		return CS_ERR_NOT_INITIALIZED;
+	}
+
+	// check if the thread is still running
+	if (k_thread_join(&_pkth_tid, K_NO_WAIT) == 0) {
+		LOG_ERR("%s", "Packet handler thread is not running, exiting.");
+		return CS_ERR_ABORTED;
 	}
 
 	// dispatch the packet data to be handled later (async)

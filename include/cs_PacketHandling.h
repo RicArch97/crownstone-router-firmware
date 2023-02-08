@@ -67,7 +67,6 @@ class PacketHandler
 				      k_work_handler_t cb);
 	cs_ret_code_t unregisterHandler(cs_router_instance_id inst_id);
 	cs_packet_handler *getHandler(cs_router_instance_id inst_id);
-	cs_packet_result *getResult(cs_router_instance_id inst_id);
 	cs_ret_code_t handlePacket(cs_packet_data *data);
 
 	/** Packet message queue */

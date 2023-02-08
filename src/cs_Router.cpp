@@ -20,10 +20,10 @@ LOG_MODULE_REGISTER(cs_Router, LOG_LEVEL_INF);
 
 #define RS485_DEVICE DT_NODELABEL(uart2)
 
-#define TEST_SSID "Crownstone"
-#define TEST_PSK  "likeashotjogger"
+#define TEST_SSID "ssid"
+#define TEST_PSK  "psk"
 
-#define HOST_ADDR "10.27.8.121"
+#define HOST_ADDR "addr"
 #define HOST_PORT 14500
 
 #define CROWNSTONE_UUID "24f000007d104805bfc17663a01c3bff"
@@ -72,7 +72,14 @@ int main(void)
 
 	LOG_INF("%s", "Crownstone router initialized");
 
-	k_sleep(K_FOREVER);
+	// wait till packet handler thread exits first,
+	// then wait for other threads to terminate
+	ret |= k_thread_join(&pkt_handler._pkth_tid, K_FOREVER);
+	ret |= k_thread_join(&web_socket._ws_tid, K_FOREVER);
+	ret |= k_thread_join(&rs485._uart_tid, K_FOREVER);
+	if (ret) {
+		return EXIT_FAILURE;
+	}
 
 	return EXIT_SUCCESS;
 }
