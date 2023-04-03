@@ -12,6 +12,7 @@ The firmware is developed using the Zephyr Project.
 * Websocket connectivity / HTTP requests
 * Data transport according to own Crownstone router protocol
 * Async data sending / receiving using message queues and threads
+* BLE Central to communicate with Crownstone devices
 
 ## Getting started
 
